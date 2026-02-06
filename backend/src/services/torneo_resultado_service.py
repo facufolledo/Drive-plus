@@ -580,20 +580,17 @@ class TorneoResultadoService:
         games_a = sum(s.get('gamesEquipoA', 0) for s in sets)
         games_b = sum(s.get('gamesEquipoB', 0) for s in sets)
         
-        # MAPEAR CORRECTAMENTE PAREJAS PARA ELO (FIX CRÍTICO)
-        # Problema: pareja1/pareja2 != equipoA/equipoB necesariamente
-        # Solución: Determinar correspondencia basándose en jugadores
+        # MAPEAR CORRECTAMENTE PAREJAS PARA ELO (FIX CRÍTICO - BUG ELO INVERTIDO)
+        # El frontend (ModalCargarResultado) SIEMPRE usa: pareja1 = equipoA, pareja2 = equipoB
+        # El resultado enviado NO incluye 'jugadores', solo 'sets' con gamesEquipoA/gamesEquipoB
+        # DEFAULT: pareja1_es_equipoA = True (convención del frontend)
+        # Solo invertir si hay jugadores en el resultado Y pareja1 NO está en equipoA
         
-        # Obtener información de jugadores por equipo del resultado
         jugadores_resultado = resultado_data.get('jugadores', {})
         jugadores_equipoA = jugadores_resultado.get('equipoA', [])
-        jugadores_equipoB = jugadores_resultado.get('equipoB', [])
         
-        # Determinar si pareja1 corresponde a equipoA o equipoB
-        pareja1_es_equipoA = False
-        
+        pareja1_es_equipoA = True  # DEFAULT: frontend usa pareja1=equipoA, pareja2=equipoB
         if jugadores_equipoA:
-            # Verificar si algún jugador de pareja1 está en equipoA
             ids_pareja1 = {pareja1.jugador1_id, pareja1.jugador2_id}
             ids_equipoA = {j.get('id') for j in jugadores_equipoA if j.get('id')}
             pareja1_es_equipoA = bool(ids_pareja1.intersection(ids_equipoA))
@@ -606,20 +603,24 @@ class TorneoResultadoService:
             games_pareja1 = games_a
             games_pareja2 = games_b
         else:
-            # pareja1 = equipoB, pareja2 = equipoA (INVERTIDO)
+            # pareja1 = equipoB, pareja2 = equipoA (INVERTIDO - caso raro con jugadores en resultado)
             sets_pareja1 = sets_b  # sets de equipoB
             sets_pareja2 = sets_a  # sets de equipoA
             games_pareja1 = games_b
             games_pareja2 = games_a
         
-        # Convertir sets al formato esperado por EloService (games_a, games_b)
-        sets_detail = [
-            {
-                'games_a': s.get('gamesEquipoA', 0),
-                'games_b': s.get('gamesEquipoB', 0)
-            }
-            for s in sets
-        ]
+        # Convertir sets al formato esperado por EloService
+        # games_a = team_a (pareja1), games_b = team_b (pareja2)
+        if pareja1_es_equipoA:
+            sets_detail = [
+                {'games_a': s.get('gamesEquipoA', 0), 'games_b': s.get('gamesEquipoB', 0)}
+                for s in sets
+            ]
+        else:
+            sets_detail = [
+                {'games_a': s.get('gamesEquipoB', 0), 'games_b': s.get('gamesEquipoA', 0)}
+                for s in sets
+            ]
         
         # Calcular ELO (CORREGIDO)
         elo_service = EloService()
