@@ -9,6 +9,7 @@ from datetime import datetime
 from ..database.config import get_db
 from ..models.driveplus_models import Usuario, PerfilUsuario, Categoria
 from ..schemas.auth import UserResponse
+from ..services.categoria_service import obtener_categoria_por_rating
 from ..auth.auth_utils import get_current_user
 from ..auth.firebase_handler import FirebaseHandler
 
@@ -673,6 +674,16 @@ async def get_perfil_publico_por_username(
         apellido = resultado.apellido or ""
         nombre_completo = f"{nombre} {apellido}".strip()
         
+        # Si no tiene categoría asignada, derivarla del rating
+        categoria_nombre = resultado.categoria_nombre
+        if not categoria_nombre:
+            rating = resultado.rating or 1200
+            sexo = resultado.sexo or "M"
+            sexo_str = "masculino" if str(sexo).upper() in ("M", "MASCULINO") else "femenino"
+            cat = obtener_categoria_por_rating(db, rating, sexo_str)
+            if cat:
+                categoria_nombre = cat.nombre
+        
         return {
             "id_usuario": resultado.id_usuario,
             "nombre_usuario": resultado.nombre_usuario,
@@ -684,7 +695,7 @@ async def get_perfil_publico_por_username(
             "pais": resultado.pais or "Argentina",
             "rating": resultado.rating or 1200,
             "partidos_jugados": resultado.partidos_jugados or 0,
-            "categoria": resultado.categoria_nombre,
+            "categoria": categoria_nombre,
             "categoria_id": resultado.id_categoria,
             "posicion_preferida": resultado.posicion_preferida,
             "mano_dominante": resultado.mano_habil,
@@ -727,6 +738,7 @@ async def buscar_usuarios_publico(
             Usuario.rating,
             Usuario.partidos_jugados,
             Usuario.id_categoria,
+            Usuario.sexo,
             Usuario.creado_en,
             PerfilUsuario.nombre,
             PerfilUsuario.apellido,
@@ -750,6 +762,15 @@ async def buscar_usuarios_publico(
         for row in resultados:
             nombre = row.nombre or "Usuario"
             apellido = row.apellido or ""
+            # Si no tiene categoría asignada, derivarla del rating
+            cat_nombre = row.categoria_nombre
+            if not cat_nombre:
+                rating = row.rating or 1200
+                sexo = row.sexo or "M"
+                sexo_str = "masculino" if str(sexo).upper() in ("M", "MASCULINO") else "femenino"
+                cat = obtener_categoria_por_rating(db, rating, sexo_str)
+                if cat:
+                    cat_nombre = cat.nombre
             resultado.append({
                 "id_usuario": row.id_usuario,
                 "nombre_usuario": row.nombre_usuario,
@@ -758,7 +779,7 @@ async def buscar_usuarios_publico(
                 "nombre_completo": f"{nombre} {apellido}".strip(),
                 "rating": row.rating or 1200,
                 "partidos_jugados": row.partidos_jugados or 0,
-                "categoria": row.categoria_nombre,
+                "categoria": cat_nombre,
                 "ciudad": row.ciudad or "",
                 "foto_perfil": row.url_avatar,
                 "fecha_registro": row.creado_en.isoformat() if row.creado_en else None

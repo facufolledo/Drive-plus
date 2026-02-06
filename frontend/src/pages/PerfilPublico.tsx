@@ -57,14 +57,28 @@ export default function PerfilPublico() {
     }
   };
 
-  const obtenerNombreCategoria = () => {
-    // Si el backend ya devuelve el nombre de la categoría, usarlo directamente
+  const obtenerNombreCategoria = (): string | null => {
+    // 1. Si el backend ya devuelve el nombre de la categoría, usarlo
     if (perfil?.categoria) return perfil.categoria;
     
-    // Si no, buscar por categoria_id
-    if (!perfil?.categoria_id || !categorias.length) return null;
-    const categoria = categorias.find(cat => cat.id_categoria === perfil.categoria_id);
-    return categoria?.nombre || null;
+    // 2. Buscar por categoria_id en la lista de categorías
+    if (perfil?.categoria_id && categorias.length > 0) {
+      const cat = categorias.find(c => c.id_categoria === perfil.categoria_id);
+      if (cat?.nombre) return cat.nombre;
+    }
+    
+    // 3. Fallback: derivar del rating cuando el usuario no tiene categoría asignada
+    if (perfil?.rating != null) {
+      const r = perfil.rating;
+      if (r >= 1800) return 'Libre';
+      if (r >= 1600) return '4ta';
+      if (r >= 1400) return '5ta';
+      if (r >= 1200) return '6ta';
+      if (r >= 1000) return '7ma';
+      if (r >= 500) return '8va';
+      return 'Principiante';
+    }
+    return null;
   };
 
   const cargarPerfil = async (username: string) => {

@@ -76,14 +76,28 @@ export default function MiPerfil() {
     }
   };
 
-  const obtenerNombreCategoria = () => {
-    // Si el backend ya devuelve el nombre de la categoría, usarlo directamente
+  const obtenerNombreCategoria = (): string | null => {
+    // 1. Si el backend ya devuelve el nombre de la categoría, usarlo
     if (usuario?.categoria) return usuario.categoria;
     
-    // Si no, buscar por id_categoria
-    if (!usuario?.id_categoria || !categorias.length) return null;
-    const categoria = categorias.find(cat => cat.id_categoria === usuario.id_categoria);
-    return categoria?.nombre || null;
+    // 2. Buscar por id_categoria en la lista de categorías
+    if (usuario?.id_categoria && categorias.length > 0) {
+      const cat = categorias.find(c => c.id_categoria === usuario.id_categoria);
+      if (cat?.nombre) return cat.nombre;
+    }
+    
+    // 3. Fallback: derivar del rating cuando no tiene categoría asignada
+    if (usuario?.rating != null) {
+      const r = usuario.rating;
+      if (r >= 1800) return 'Libre';
+      if (r >= 1600) return '4ta';
+      if (r >= 1400) return '5ta';
+      if (r >= 1200) return '6ta';
+      if (r >= 1000) return '7ma';
+      if (r >= 500) return '8va';
+      return 'Principiante';
+    }
+    return null;
   };
 
   const cargarPartidos = async () => {
