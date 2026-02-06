@@ -73,6 +73,7 @@ export interface Pareja {
   estado: 'pendiente' | 'inscripta' | 'confirmada' | 'baja' | 'rechazada' | 'expirada';
   jugador1_nombre?: string;
   jugador2_nombre?: string;
+  disponibilidad_horaria?: any; // Restricciones horarias de la pareja
 }
 
 export interface EstadisticasTorneo {
@@ -257,6 +258,7 @@ class TorneoService {
     const response = await axios.get(`${API_URL}/torneos/${torneoId}/parejas`, {
       params: { estado, categoria_id: categoriaId },
     });
+    console.log('🔍 SERVICE - Respuesta del backend (primeras 2 parejas):', response.data.slice(0, 2));
     return response.data;
   }
 

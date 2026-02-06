@@ -8,7 +8,7 @@ from datetime import datetime
 
 from ..models.torneo_models import (
     Torneo, TorneoOrganizador, OrganizadorAutorizado,
-    EstadoTorneo, RolOrganizador
+    EstadoTorneo, RolOrganizador, TorneoCancha
 )
 from ..schemas.torneo_schemas import TorneoCreate, TorneoUpdate
 
@@ -79,6 +79,31 @@ class TorneoService:
         # Validar género
         genero = torneo_data.genero if torneo_data.genero in ['masculino', 'femenino', 'mixto'] else 'masculino'
         
+        # Procesar horarios disponibles
+        # El frontend puede enviar {semana: [], finDeSemana: []} o un array directo
+        horarios_procesados = []
+        horarios_raw = getattr(torneo_data, 'horarios_disponibles', [])
+        
+        if isinstance(horarios_raw, dict):
+            # Formato del frontend: {semana: [{desde, hasta}], finDeSemana: [{desde, hasta}]}
+            if 'semana' in horarios_raw:
+                for h in horarios_raw['semana']:
+                    horarios_procesados.append({
+                        'dias': ['lunes', 'martes', 'miercoles', 'jueves'],
+                        'horaInicio': h.get('desde', '09:00'),
+                        'horaFin': h.get('hasta', '23:00')
+                    })
+            if 'finDeSemana' in horarios_raw:
+                for h in horarios_raw['finDeSemana']:
+                    horarios_procesados.append({
+                        'dias': ['viernes', 'sabado', 'domingo'],
+                        'horaInicio': h.get('desde', '09:00'),
+                        'horaFin': h.get('hasta', '23:00')
+                    })
+        elif isinstance(horarios_raw, list):
+            # Ya viene en formato correcto
+            horarios_procesados = horarios_raw
+        
         # Crear torneo
         torneo = Torneo(
             nombre=torneo_data.nombre,
@@ -98,8 +123,8 @@ class TorneoService:
             titular_cuenta=getattr(torneo_data, 'titular_cuenta', None),
             banco=getattr(torneo_data, 'banco', None),
             telefono_contacto=getattr(torneo_data, 'telefono_contacto', None),
-            # Horarios disponibles
-            horarios_disponibles=getattr(torneo_data, 'horarios_disponibles', [])
+            # Horarios disponibles procesados
+            horarios_disponibles=horarios_procesados
         )
         
         db.add(torneo)
@@ -112,6 +137,17 @@ class TorneoService:
             rol=RolOrganizador.OWNER
         )
         db.add(organizador)
+        
+        # Crear canchas automáticamente si se especificaron en reglas_json
+        if torneo_data.reglas_json and 'canchas_disponibles' in torneo_data.reglas_json:
+            num_canchas = torneo_data.reglas_json['canchas_disponibles']
+            for i in range(1, num_canchas + 1):
+                cancha = TorneoCancha(
+                    torneo_id=torneo.id,
+                    nombre=f"Cancha {i}",
+                    activa=True
+                )
+                db.add(cancha)
         
         db.commit()
         db.refresh(torneo)

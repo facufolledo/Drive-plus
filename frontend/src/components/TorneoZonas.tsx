@@ -254,10 +254,8 @@ export default function TorneoZonas({ torneoId, esOrganizador }: TorneoZonasProp
 
   // Función para abrir modal de horarios
   const verHorariosPareja = (pareja: any) => {
-    setParejaHorarios({
-      nombre: pareja.pareja_nombre || 'Pareja',
-      disponibilidad_horaria: pareja.disponibilidad_horaria
-    });
+    // Pasar el objeto completo de la pareja al modal
+    setParejaHorarios(pareja);
     setModalHorariosOpen(true);
   };
 

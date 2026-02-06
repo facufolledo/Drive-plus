@@ -276,7 +276,8 @@ class TorneoZonaService:
                         'jugador1_id': pareja.jugador1_id,
                         'jugador2_id': pareja.jugador2_id,
                         'estado': pareja.estado,
-                        'eliminada': False
+                        'eliminada': False,
+                        'disponibilidad_horaria': pareja.disponibilidad_horaria
                     })
                 else:
                     # Pareja fue eliminada - mostrar placeholder

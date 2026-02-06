@@ -7,6 +7,7 @@ import Button from './Button';
 import SkeletonLoader from './SkeletonLoader';
 import ModalCargarResultado from './ModalCargarResultado';
 import ModalHorariosPareja from './ModalHorariosPareja';
+import ModalCambiarHorario from './ModalCambiarHorario';
 import html2canvas from 'html2canvas';
 
 interface TorneoFixtureProps {
@@ -31,6 +32,20 @@ export default function TorneoFixture({ torneoId, esOrganizador }: TorneoFixture
   const [partidosNoProgramados, setPartidosNoProgramados] = useState<any[]>([]);
   const [parejaHorarios, setParejaHorarios] = useState<any>(null);
   const [modalHorariosOpen, setModalHorariosOpen] = useState(false);
+  const [partidoEditando, setPartidoEditando] = useState<any>(null);
+  const [modalCambiarHorarioOpen, setModalCambiarHorarioOpen] = useState(false);
+
+  // Helper para parsear fechas sin conversión de zona horaria
+  const parseFechaLocal = (fechaStr: string) => {
+    const fecha = new Date(fechaStr);
+    const year = fecha.getUTCFullYear();
+    const month = fecha.getUTCMonth();
+    const day = fecha.getUTCDate();
+    const hours = fecha.getUTCHours();
+    const minutes = fecha.getUTCMinutes();
+    const seconds = fecha.getUTCSeconds();
+    return new Date(year, month, day, hours, minutes, seconds);
+  };
 
   useEffect(() => {
     // Guard: Solo cargar si torneoId es válido
@@ -212,11 +227,11 @@ export default function TorneoFixture({ torneoId, esOrganizador }: TorneoFixture
   };
 
   const verHorariosPareja = (partido: any, pareja: 'pareja1' | 'pareja2') => {
-    const nombre = pareja === 'pareja1' ? partido.pareja1_nombre : partido.pareja2_nombre;
+    const nombre_pareja = pareja === 'pareja1' ? partido.pareja1_nombre : partido.pareja2_nombre;
     const disponibilidad = pareja === 'pareja1' ? partido.pareja1_disponibilidad : partido.pareja2_disponibilidad;
     
     setParejaHorarios({
-      nombre: nombre || 'Pareja',
+      nombre_pareja: nombre_pareja || 'Pareja',
       disponibilidad_horaria: disponibilidad
     });
     setModalHorariosOpen(true);
@@ -311,64 +326,66 @@ export default function TorneoFixture({ torneoId, esOrganizador }: TorneoFixture
                 </Button>
               </div>
               
-              {/* Botones por categoría */}
+              {/* Botones por categoría - SIEMPRE MOSTRAR si hay categorías */}
               {categorias.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-sm text-textSecondary font-medium">O generar por categoría:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {categorias.map(cat => {
-                      const esF = cat.genero === 'femenino';
-                      const esMixto = cat.genero === 'mixto';
-                      const icon = esMixto ? '⚥' : esF ? '♀' : '♂';
-                      const colorClass = esMixto 
-                        ? 'from-purple-500 to-purple-600' 
-                        : esF 
-                          ? 'from-pink-500 to-pink-600' 
-                          : 'from-blue-500 to-blue-600';
-                      
-                      return (
-                        <Button
-                          key={cat.id}
-                          onClick={() => generarFixture(cat.id)}
-                          disabled={generando}
-                          variant="secondary"
-                          className={`flex items-center gap-2 bg-gradient-to-r ${colorClass} text-white hover:opacity-90`}
-                        >
-                          <span>{icon}</span>
-                          <span>{cat.nombre}</span>
-                        </Button>
-                      );
-                    })}
-                  </div>
+              <div className="space-y-2">
+                <p className="text-sm text-textSecondary font-medium">
+                  {partidos.length > 0 ? 'Generar/Regenerar por categoría:' : 'O generar por categoría:'}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {categorias.map(cat => {
+                    const esF = cat.genero === 'femenino';
+                    const esMixto = cat.genero === 'mixto';
+                    const icon = esMixto ? '⚥' : esF ? '♀' : '♂';
+                    const colorClass = esMixto 
+                      ? 'from-purple-500 to-purple-600' 
+                      : esF 
+                        ? 'from-pink-500 to-pink-600' 
+                        : 'from-blue-500 to-blue-600';
+                    
+                    return (
+                      <Button
+                        key={cat.id}
+                        onClick={() => generarFixture(cat.id)}
+                        disabled={generando}
+                        variant="secondary"
+                        className={`flex items-center gap-2 bg-gradient-to-r ${colorClass} text-white hover:opacity-90`}
+                      >
+                        <span>{icon}</span>
+                        <span>{cat.nombre}</span>
+                      </Button>
+                    );
+                  })}
                 </div>
-              )}
-              
-              {/* Botones de eliminar (solo si hay partidos) */}
-              {partidos.length > 0 && (
-                <div className="flex flex-wrap gap-2 pt-2 border-t border-cardBorder/50">
+              </div>
+            )}
+            
+            {/* Botones de eliminar (solo si hay partidos) */}
+            {partidos.length > 0 && (
+              <div className="flex flex-wrap gap-2 pt-2 border-t border-cardBorder/50">
+                <Button
+                  onClick={() => eliminarFixture()}
+                  disabled={generando}
+                  variant="danger"
+                  size="sm"
+                  className="flex-1 min-w-[180px]"
+                >
+                  {generando ? 'Eliminando...' : 'Eliminar Todo el Fixture'}
+                </Button>
+                
+                {categoriaFiltro && (
                   <Button
-                    onClick={() => eliminarFixture()}
+                    onClick={() => eliminarFixture(categoriaFiltro)}
                     disabled={generando}
                     variant="danger"
                     size="sm"
                     className="flex-1 min-w-[180px]"
                   >
-                    {generando ? 'Eliminando...' : 'Eliminar Todo el Fixture'}
+                    {generando ? 'Eliminando...' : 'Eliminar Esta Categoría'}
                   </Button>
-                  
-                  {categoriaFiltro && (
-                    <Button
-                      onClick={() => eliminarFixture(categoriaFiltro)}
-                      disabled={generando}
-                      variant="danger"
-                      size="sm"
-                      className="flex-1 min-w-[180px]"
-                    >
-                      {generando ? 'Eliminando...' : 'Eliminar Esta Categoría'}
-                    </Button>
-                  )}
-                </div>
-              )}
+                )}
+              </div>
+            )}
             </div>
           )}
         </div>
@@ -526,6 +543,84 @@ export default function TorneoFixture({ torneoId, esOrganizador }: TorneoFixture
         </div>
       )}
 
+      {/* BOTONES DE GENERAR Y ELIMINAR FIXTURE */}
+      {esOrganizador && (
+        <Card>
+          <div className="p-4 space-y-3">
+            {/* Botones de generar */}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={() => generarFixture()}
+                disabled={generando}
+                variant="accent"
+                size="sm"
+                className="flex-1 min-w-[180px]"
+              >
+                {generando ? 'Generando...' : 'Regenerar Fixture Completo'}
+              </Button>
+            </div>
+            
+            {/* Botones por categoría */}
+            {categorias.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm text-textSecondary font-medium">Generar/Regenerar por categoría:</p>
+                <div className="flex flex-wrap gap-2">
+                  {categorias.map(cat => {
+                    const esF = cat.genero === 'femenino';
+                    const esMixto = cat.genero === 'mixto';
+                    const icon = esMixto ? '⚥' : esF ? '♀' : '♂';
+                    const colorClass = esMixto 
+                      ? 'from-purple-500 to-purple-600' 
+                      : esF 
+                        ? 'from-pink-500 to-pink-600' 
+                        : 'from-blue-500 to-blue-600';
+                    
+                    return (
+                      <Button
+                        key={cat.id}
+                        onClick={() => generarFixture(cat.id)}
+                        disabled={generando}
+                        variant="secondary"
+                        size="sm"
+                        className={`flex items-center gap-2 bg-gradient-to-r ${colorClass} text-white hover:opacity-90`}
+                      >
+                        <span>{icon}</span>
+                        <span>{cat.nombre}</span>
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            
+            {/* Botones de eliminar */}
+            <div className="flex flex-wrap gap-2 pt-2 border-t border-cardBorder/50">
+              <Button
+                onClick={() => eliminarFixture()}
+                disabled={generando}
+                variant="danger"
+                size="sm"
+                className="flex-1 min-w-[180px]"
+              >
+                {generando ? 'Eliminando...' : 'Eliminar Todo el Fixture'}
+              </Button>
+              
+              {categoriaFiltro && (
+                <Button
+                  onClick={() => eliminarFixture(categoriaFiltro)}
+                  disabled={generando}
+                  variant="danger"
+                  size="sm"
+                  className="flex-1 min-w-[180px]"
+                >
+                  {generando ? 'Eliminando...' : `Eliminar ${categorias.find(c => c.id === categoriaFiltro)?.nombre || 'Categoría'}`}
+                </Button>
+              )}
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* Header con filtros de zona y botón de captura */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2 overflow-x-auto">
@@ -604,7 +699,7 @@ export default function TorneoFixture({ torneoId, esOrganizador }: TorneoFixture
                                 <Calendar size={12} className="text-primary md:w-[14px] md:h-[14px]" />
                               </div>
                               <span className="font-medium">
-                                {partido.fecha_hora ? new Date(partido.fecha_hora).toLocaleDateString('es-ES', {
+                                {partido.fecha_hora ? parseFechaLocal(partido.fecha_hora).toLocaleDateString('es-ES', {
                                   weekday: 'short',
                                   day: 'numeric',
                                   month: 'short'
@@ -613,14 +708,27 @@ export default function TorneoFixture({ torneoId, esOrganizador }: TorneoFixture
                             </div>
                             {/* Hora */}
                             {partido.fecha_hora && (
-                              <div className="flex items-center gap-1">
+                              <div className="flex items-center gap-1.5">
                                 <Clock size={12} className="text-accent md:w-[14px] md:h-[14px]" />
                                 <span className="font-bold text-accent">
-                                  {new Date(partido.fecha_hora).toLocaleTimeString('es-ES', {
+                                  {parseFechaLocal(partido.fecha_hora).toLocaleTimeString('es-ES', {
                                     hour: '2-digit',
                                     minute: '2-digit'
                                   })}
                                 </span>
+                                {/* Botón cambiar horario (solo organizadores) */}
+                                {esOrganizador && partido.estado === 'pendiente' && (
+                                  <button
+                                    onClick={() => {
+                                      setPartidoEditando(partido);
+                                      setModalCambiarHorarioOpen(true);
+                                    }}
+                                    className="p-1 hover:bg-accent/10 rounded transition-colors text-accent/60 hover:text-accent"
+                                    title="Cambiar horario"
+                                  >
+                                    <Clock size={12} className="md:w-3 md:h-3" />
+                                  </button>
+                                )}
                               </div>
                             )}
                             {/* Cancha */}
@@ -733,7 +841,7 @@ export default function TorneoFixture({ torneoId, esOrganizador }: TorneoFixture
                             variant="accent"
                             size="sm"
                             onClick={() => abrirModalResultado(partido)}
-                            className="w-full mt-2 text-xs md:text-sm py-2"
+                            className="w-full text-xs md:text-sm py-2"
                           >
                             Cargar Resultado
                           </Button>
@@ -771,6 +879,25 @@ export default function TorneoFixture({ torneoId, esOrganizador }: TorneoFixture
             setParejaHorarios(null);
           }}
           pareja={parejaHorarios}
+        />
+      )}
+
+      {/* Modal Cambiar Horario */}
+      {partidoEditando && (
+        <ModalCambiarHorario
+          isOpen={modalCambiarHorarioOpen}
+          onClose={() => {
+            setModalCambiarHorarioOpen(false);
+            setPartidoEditando(null);
+          }}
+          torneoId={torneoId}
+          partidoId={partidoEditando.id_partido}
+          partidoActual={partidoEditando}
+          onSuccess={() => {
+            cargarDatos();
+            setModalCambiarHorarioOpen(false);
+            setPartidoEditando(null);
+          }}
         />
       )}
     </div>

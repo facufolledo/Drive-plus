@@ -2843,3 +2843,187 @@ def eliminar_bloqueo(
     db.commit()
     
     return {"message": "Bloqueo eliminado"}
+
+
+# ============================================
+# CAMBIO MANUAL DE HORARIOS
+# ============================================
+
+class CambiarHorarioRequest(BaseModel):
+    fecha: str  # "2026-02-06"
+    hora: str   # "19:10"
+    cancha_id: int
+
+
+@router.put("/{torneo_id}/partidos/{partido_id}/cambiar-horario")
+def cambiar_horario_partido(
+    torneo_id: int,
+    partido_id: int,
+    request: CambiarHorarioRequest,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user)
+):
+    """
+    Cambia manualmente el horario y cancha de un partido
+    Valida solapamientos con otros partidos en la misma cancha
+    """
+    from ..models.driveplus_models import Partido
+    from ..models.torneo_models import TorneoCancha, TorneoPareja
+    from ..services.torneo_zona_service import TorneoZonaService
+    from datetime import datetime, timedelta
+    
+    try:
+        # Verificar permisos
+        if not TorneoZonaService._es_organizador(db, torneo_id, current_user.id_usuario):
+            raise HTTPException(status_code=403, detail="No tienes permisos")
+        
+        # Obtener partido
+        partido = db.query(Partido).filter(
+            Partido.id_partido == partido_id,
+            Partido.id_torneo == torneo_id
+        ).first()
+        
+        if not partido:
+            raise HTTPException(status_code=404, detail="Partido no encontrado")
+        
+        # Verificar que la cancha existe y está activa
+        cancha = db.query(TorneoCancha).filter(
+            TorneoCancha.id == request.cancha_id,
+            TorneoCancha.torneo_id == torneo_id,
+            TorneoCancha.activa == True
+        ).first()
+        
+        if not cancha:
+            raise HTTPException(
+                status_code=404, 
+                detail="Cancha no encontrada o no está activa"
+            )
+        
+        # Parsear fecha y hora
+        try:
+            fecha_hora_nueva = datetime.strptime(
+                f"{request.fecha} {request.hora}:00",
+                "%Y-%m-%d %H:%M:%S"
+            )
+        except ValueError as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Formato de fecha/hora inválido: {str(e)}"
+            )
+        
+        # Calcular fin del partido (50 minutos)
+        fecha_hora_fin = fecha_hora_nueva + timedelta(minutes=50)
+        
+        # 🔍 VALIDAR SOLAPAMIENTO CON OTROS PARTIDOS EN LA MISMA CANCHA
+        partidos_en_cancha = db.query(Partido).filter(
+            Partido.id_torneo == torneo_id,
+            Partido.cancha_id == request.cancha_id,
+            Partido.id_partido != partido_id,  # Excluir el partido actual
+            Partido.fecha_hora.isnot(None)
+        ).all()
+        
+        conflictos = []
+        for otro_partido in partidos_en_cancha:
+            otro_inicio = otro_partido.fecha_hora
+            
+            # 🔴 FIX: Normalizar timezone - convertir ambas fechas a naive
+            if otro_inicio.tzinfo is not None:
+                otro_inicio = otro_inicio.replace(tzinfo=None)
+            
+            otro_fin = otro_inicio + timedelta(minutes=50)
+            
+            # Verificar solapamiento
+            # Hay solapamiento si: nuevo_inicio < otro_fin AND nuevo_fin > otro_inicio
+            if fecha_hora_nueva < otro_fin and fecha_hora_fin > otro_inicio:
+                # Obtener nombres de parejas para el mensaje
+                pareja1 = db.query(TorneoPareja).filter(
+                    TorneoPareja.id == otro_partido.pareja1_id
+                ).first()
+                pareja2 = db.query(TorneoPareja).filter(
+                    TorneoPareja.id == otro_partido.pareja2_id
+                ).first()
+                
+                pareja1_nombre = "Pareja desconocida"
+                pareja2_nombre = "Pareja desconocida"
+                
+                if pareja1:
+                    j1 = db.query(Usuario).filter(Usuario.id_usuario == pareja1.jugador1_id).first()
+                    j2 = db.query(Usuario).filter(Usuario.id_usuario == pareja1.jugador2_id).first()
+                    if j1 and j2:
+                        pareja1_nombre = f"{j1.nombre_usuario}/{j2.nombre_usuario}"
+                
+                if pareja2:
+                    j1 = db.query(Usuario).filter(Usuario.id_usuario == pareja2.jugador1_id).first()
+                    j2 = db.query(Usuario).filter(Usuario.id_usuario == pareja2.jugador2_id).first()
+                    if j1 and j2:
+                        pareja2_nombre = f"{j1.nombre_usuario}/{j2.nombre_usuario}"
+                
+                conflictos.append({
+                    "partido_id": otro_partido.id_partido,
+                    "pareja1": pareja1_nombre,
+                    "pareja2": pareja2_nombre,
+                    "fecha_hora": otro_inicio.strftime("%Y-%m-%d %H:%M"),
+                    "cancha": cancha.nombre
+                })
+        
+        # Si hay conflictos, retornar advertencia
+        if conflictos:
+            return {
+                "success": False,
+                "error": "SOLAPAMIENTO_DETECTADO",
+                "message": f"El horario solicitado se solapa con {len(conflictos)} partido(s) en {cancha.nombre}",
+                "conflictos": conflictos,
+                "horario_solicitado": {
+                    "fecha": request.fecha,
+                    "hora": request.hora,
+                    "cancha": cancha.nombre,
+                    "inicio": fecha_hora_nueva.strftime("%Y-%m-%d %H:%M"),
+                    "fin": fecha_hora_fin.strftime("%Y-%m-%d %H:%M")
+                }
+            }
+        
+        # ✅ No hay conflictos - Actualizar partido
+        partido.fecha_hora = fecha_hora_nueva
+        partido.fecha = fecha_hora_nueva  # También actualizar campo fecha
+        partido.cancha_id = request.cancha_id
+        
+        db.commit()
+        
+        # Obtener nombres de parejas del partido actualizado
+        pareja1 = db.query(TorneoPareja).filter(TorneoPareja.id == partido.pareja1_id).first()
+        pareja2 = db.query(TorneoPareja).filter(TorneoPareja.id == partido.pareja2_id).first()
+        
+        pareja1_nombre = "Pareja desconocida"
+        pareja2_nombre = "Pareja desconocida"
+        
+        if pareja1:
+            j1 = db.query(Usuario).filter(Usuario.id_usuario == pareja1.jugador1_id).first()
+            j2 = db.query(Usuario).filter(Usuario.id_usuario == pareja1.jugador2_id).first()
+            if j1 and j2:
+                pareja1_nombre = f"{j1.nombre_usuario}/{j2.nombre_usuario}"
+        
+        if pareja2:
+            j1 = db.query(Usuario).filter(Usuario.id_usuario == pareja2.jugador1_id).first()
+            j2 = db.query(Usuario).filter(Usuario.id_usuario == pareja2.jugador2_id).first()
+            if j1 and j2:
+                pareja2_nombre = f"{j1.nombre_usuario}/{j2.nombre_usuario}"
+        
+        return {
+            "success": True,
+            "message": "Horario actualizado correctamente",
+            "partido": {
+                "id": partido_id,
+                "pareja1": pareja1_nombre,
+                "pareja2": pareja2_nombre,
+                "fecha": request.fecha,
+                "hora": request.hora,
+                "cancha": cancha.nombre,
+                "cancha_id": cancha.id
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))

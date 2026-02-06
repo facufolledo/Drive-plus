@@ -279,6 +279,7 @@ export function TorneosProvider({ children }: { children: ReactNode }) {
       setError(null);
       
       const parejasData = await torneoService.listarParejas(torneoId);
+      console.log('🔍 CONTEXT - Guardando parejas en estado (primeras 2):', parejasData.slice(0, 2));
       setParejas(parejasData);
     } catch (err: any) {
       console.error('Error al cargar parejas:', err);

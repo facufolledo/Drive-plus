@@ -6,7 +6,8 @@ interface ModalHorariosParejaProps {
   isOpen: boolean;
   onClose: () => void;
   pareja: {
-    nombre: string;
+    nombre_pareja?: string;
+    pareja_nombre?: string;
     disponibilidad_horaria?: any;
   };
 }
@@ -18,6 +19,9 @@ export default function ModalHorariosPareja({
 }: ModalHorariosParejaProps) {
   if (!isOpen) return null;
 
+  console.log('🔍 MODAL - Pareja recibida:', pareja);
+  console.log('🔍 MODAL - disponibilidad_horaria:', pareja.disponibilidad_horaria);
+
   // Parsear disponibilidad horaria
   let franjas: any[] = [];
   try {
@@ -26,12 +30,16 @@ export default function ModalHorariosPareja({
         ? JSON.parse(pareja.disponibilidad_horaria)
         : pareja.disponibilidad_horaria;
       
+      console.log('🔍 MODAL - disponibilidad parseada:', disponibilidad);
+      
       // Manejar ambos formatos: array directo o objeto con propiedad "franjas"
       if (Array.isArray(disponibilidad)) {
         franjas = disponibilidad;
       } else if (disponibilidad?.franjas && Array.isArray(disponibilidad.franjas)) {
         franjas = disponibilidad.franjas;
       }
+      
+      console.log('🔍 MODAL - franjas finales:', franjas);
     }
   } catch (error) {
     console.error('Error parseando disponibilidad horaria:', error);
@@ -68,7 +76,9 @@ export default function ModalHorariosPareja({
               <h3 className="text-lg font-bold text-textPrimary">
                 Restricciones Horarias
               </h3>
-              <p className="text-xs text-textSecondary">{pareja.nombre}</p>
+              <p className="text-xs text-textSecondary">
+                {pareja.nombre_pareja || pareja.pareja_nombre || 'Pareja'}
+              </p>
             </div>
           </div>
           <button

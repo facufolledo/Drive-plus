@@ -20,6 +20,8 @@ export default function TorneoParejas({
   esOrganizador,
   onUpdate,
 }: TorneoParejaProps) {
+  console.log('🔍 COMPONENT - TorneoParejas recibió parejas:', parejas.slice(0, 2));
+  
   const [loading, setLoading] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
@@ -124,11 +126,9 @@ export default function TorneoParejas({
     await cargarCategorias();
   };
 
-  const verHorariosPareja = (pareja: Pareja) => {
-    setParejaHorarios({
-      nombre: pareja.nombre_pareja || 'Pareja',
-      disponibilidad_horaria: (pareja as any).disponibilidad_horaria
-    });
+  const verHorariosPareja = (pareja: any) => {
+    // Pasar el objeto completo de la pareja al modal
+    setParejaHorarios(pareja);
     setModalHorariosOpen(true);
   };
 
