@@ -53,16 +53,13 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <button 
             onClick={() => window.location.reload()}
-            className="flex items-center gap-2 md:gap-3 hover:opacity-80 transition-opacity cursor-pointer"
+            className="flex items-center hover:opacity-80 transition-opacity cursor-pointer"
           >
             <img 
               src={`${import.meta.env.BASE_URL}logo-drive.png`}
               alt="Drive+ Logo" 
-              className="w-8 h-8 md:w-10 md:h-10"
+              className="h-10 md:h-12 w-auto object-contain"
             />
-            <h1 className="text-xl md:text-2xl font-black text-white">
-              Drive<span className="text-primary">+</span>
-            </h1>
           </button>
           {isAuthenticated ? (
             <motion.button

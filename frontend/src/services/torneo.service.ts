@@ -176,7 +176,13 @@ class TorneoService {
   // Inscripciones
   async inscribirPareja(
     torneoId: number,
-    data: { jugador1_id: number; jugador2_id: number; nombre_pareja?: string; categoria_id?: number }
+    data: { 
+      jugador1_id: number; 
+      jugador2_id: number; 
+      nombre_pareja?: string; 
+      categoria_id?: number;
+      disponibilidad_horaria?: any[];
+    }
   ): Promise<{ pareja_id: number; codigo_confirmacion: string; fecha_expiracion: string; mensaje: string }> {
     const response = await axios.post(
       `${API_URL}/torneos/${torneoId}/inscribir`,

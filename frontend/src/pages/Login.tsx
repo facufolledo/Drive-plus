@@ -124,11 +124,8 @@ export default function Login() {
             <img 
               src={`${import.meta.env.BASE_URL}logo-drive.png`}
               alt="Drive+ Logo" 
-              className="w-20 h-20 md:w-28 md:h-28 mb-2 md:mb-3"
+              className="h-24 md:h-32 w-auto object-contain"
             />
-            <h1 className="text-2xl md:text-3xl font-black text-textPrimary">
-              Drive<span className="text-primary">+</span>
-            </h1>
           </motion.div>
           <p className="text-textSecondary text-center text-sm md:text-base">Gestión de torneos de pádel</p>
         </div>

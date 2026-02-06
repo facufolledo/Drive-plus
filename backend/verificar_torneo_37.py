@@ -116,9 +116,18 @@ def verificar_torneo37():
         
         if horarios and horarios[0]:
             print(f"\n⏰ HORARIOS DEL TORNEO:")
-            for h in horarios[0]:
-                dias = ", ".join(h['dias'])
-                print(f"   • {dias}: {h['horaInicio']} - {h['horaFin']}")
+            import json
+            # Puede ser dict, list o string JSON
+            horarios_data = horarios[0]
+            if isinstance(horarios_data, str):
+                horarios_data = json.loads(horarios_data)
+            
+            if isinstance(horarios_data, list):
+                for h in horarios_data:
+                    dias = ", ".join(h['dias']) if isinstance(h['dias'], list) else h['dias']
+                    print(f"   • {dias}: {h['horaInicio']} - {h['horaFin']}")
+            else:
+                print(f"   ⚠️  Formato de horarios no reconocido: {type(horarios_data)}")
         else:
             print(f"\n⚠️  El torneo no tiene horarios configurados")
         

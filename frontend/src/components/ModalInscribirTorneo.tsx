@@ -240,13 +240,26 @@ export default function ModalInscribirTorneo({
     }
 
     try {
-      const resultado = await torneoService.inscribirPareja(torneoId, {
+      console.log('🔍 DEBUG - INSCRIPCIÓN FRONTEND');
+      console.log('Disponibilidad horaria:', disponibilidadHoraria);
+      console.log('Longitud:', disponibilidadHoraria.length);
+      console.log('Tipo:', typeof disponibilidadHoraria);
+      console.log('Es array:', Array.isArray(disponibilidadHoraria));
+      
+      const dataToSend = {
         jugador1_id: jugador1.id_usuario,
         jugador2_id: jugador2.id_usuario,
         nombre_pareja: nombrePareja,
         categoria_id: categoriaSeleccionada || undefined,
         disponibilidad_horaria: disponibilidadHoraria.length > 0 ? disponibilidadHoraria : undefined,
-      });
+      };
+      
+      console.log('📤 Datos a enviar:', dataToSend);
+      console.log('📤 disponibilidad_horaria en data:', dataToSend.disponibilidad_horaria);
+      
+      const resultado = await torneoService.inscribirPareja(torneoId, dataToSend);
+      
+      console.log('✅ Resultado inscripción:', resultado);
 
       setCodigoConfirmacion(resultado.codigo_confirmacion);
       setParejaId(resultado.pareja_id);

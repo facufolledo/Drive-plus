@@ -1,72 +1,81 @@
 """
-Limpiar fixture del torneo 37 para regenerarlo con restricciones
+Script para eliminar el fixture del torneo 37
 """
-import sys
 import os
-sys.path.insert(0, os.path.dirname(__file__))
-
+import sys
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
+# Cargar variables de entorno
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL")
-engine = create_engine(DATABASE_URL)
-Session = sessionmaker(bind=engine)
+# Configurar base de datos
+DATABASE_URL = os.getenv('DATABASE_URL')
+if not DATABASE_URL:
+    print("❌ Error: DATABASE_URL no configurada")
+    sys.exit(1)
 
-def limpiar_fixture():
-    session = Session()
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(bind=engine)
+
+def limpiar_fixture_torneo37():
+    """Elimina todos los partidos del torneo 37"""
+    db = SessionLocal()
     
     try:
-        print("=" * 80)
-        print("LIMPIANDO FIXTURE DEL TORNEO 37")
-        print("=" * 80)
+        print("\n🔍 Verificando partidos del torneo 37...")
         
-        # Contar partidos actuales
-        partidos = session.execute(
-            text("SELECT COUNT(*) FROM partidos WHERE id_torneo = 37")
-        ).fetchone()
+        # Contar partidos existentes
+        result = db.execute(text("""
+            SELECT COUNT(*) as total
+            FROM partidos
+            WHERE id_torneo = 37
+        """))
+        total_antes = result.fetchone()[0]
         
-        print(f"\n📊 Partidos actuales: {partidos[0]}")
+        print(f"   📊 Partidos encontrados: {total_antes}")
         
-        if partidos[0] == 0:
-            print("\n✅ No hay partidos para eliminar")
+        if total_antes == 0:
+            print("   ✅ No hay partidos para eliminar")
+            return
+        
+        # Confirmar eliminación
+        print(f"\n⚠️  Se eliminarán {total_antes} partidos del torneo 37")
+        confirmacion = input("¿Continuar? (s/n): ")
+        
+        if confirmacion.lower() != 's':
+            print("❌ Operación cancelada")
             return
         
         # Eliminar partidos
-        session.execute(
-            text("DELETE FROM partidos WHERE id_torneo = 37")
-        )
+        print("\n🗑️  Eliminando partidos...")
+        db.execute(text("""
+            DELETE FROM partidos
+            WHERE id_torneo = 37
+        """))
+        db.commit()
         
-        # Limpiar tablas de posiciones
-        zonas = session.execute(
-            text("SELECT id FROM torneo_zonas WHERE torneo_id = 37")
-        ).fetchall()
-        
-        if zonas:
-            zonas_ids = [z[0] for z in zonas]
-            session.execute(
-                text(f"DELETE FROM torneo_tabla_posiciones WHERE zona_id IN ({','.join(map(str, zonas_ids))})")
-            )
-        
-        session.commit()
+        # Verificar eliminación
+        result = db.execute(text("""
+            SELECT COUNT(*) as total
+            FROM partidos
+            WHERE id_torneo = 37
+        """))
+        total_despues = result.fetchone()[0]
         
         print(f"\n✅ Fixture eliminado exitosamente")
-        print(f"   • {partidos[0]} partidos eliminados")
-        print(f"   • Tablas de posiciones limpiadas")
-        print(f"\n💡 Ahora puedes regenerar el fixture desde el frontend")
-        print(f"   con el botón 'Generar Fixture' que respetará las restricciones")
+        print(f"   Partidos eliminados: {total_antes}")
+        print(f"   Partidos restantes: {total_despues}")
         
-        print(f"\n{'=' * 80}")
+        print("\n📝 Ahora puedes regenerar el fixture con:")
+        print("   python backend/test_generar_fixture_torneo37.py")
         
     except Exception as e:
-        session.rollback()
         print(f"\n❌ Error: {e}")
-        import traceback
-        traceback.print_exc()
+        db.rollback()
     finally:
-        session.close()
+        db.close()
 
 if __name__ == "__main__":
-    limpiar_fixture()
+    limpiar_fixture_torneo37()

@@ -56,7 +56,7 @@ export default function TorneoProgramacion({ torneoId, esOrganizador }: TorneoPr
   // Programación automática
   const [fechaInicio, setFechaInicio] = useState('');
   const [fechaFin, setFechaFin] = useState('');
-  const [duracionPartido, setDuracionPartido] = useState(90);
+  const [duracionPartido, setDuracionPartido] = useState(70);
   
   // Horarios por tipo de día
   const [horaInicioSemana, setHoraInicioSemana] = useState('17:00'); // Lun-Vie desde las 17

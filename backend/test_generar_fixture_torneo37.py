@@ -38,14 +38,14 @@ def test_generar_fixture():
         user_id = torneo[0]
         print(f"\n👤 Usuario creador: {user_id}")
         
-        print("\n🔄 Generando fixture para categoría 7ma (ID 85)...")
+        print("\n🔄 Generando fixture para TODAS las categorías del torneo 37...")
         
-        # Generar fixture solo para categoría 7ma
+        # Generar fixture para todas las categorías
         resultado = TorneoFixtureGlobalService.generar_fixture_completo(
             db=session,
             torneo_id=37,
-            user_id=user_id,
-            categoria_id=85  # 7ma
+            user_id=user_id
+            # Sin categoria_id = genera para todas
         )
         
         print(f"\n✅ FIXTURE GENERADO:")
@@ -83,7 +83,8 @@ def test_generar_fixture():
                     u1.nombre_usuario as j1_p1,
                     u2.nombre_usuario as j2_p1,
                     u3.nombre_usuario as j1_p2,
-                    u4.nombre_usuario as j2_p2
+                    u4.nombre_usuario as j2_p2,
+                    tc.nombre as categoria_nombre
                 FROM partidos p
                 JOIN torneos_parejas tp1 ON p.pareja1_id = tp1.id
                 JOIN torneos_parejas tp2 ON p.pareja2_id = tp2.id
@@ -91,7 +92,8 @@ def test_generar_fixture():
                 JOIN usuarios u2 ON tp1.jugador2_id = u2.id_usuario
                 JOIN usuarios u3 ON tp2.jugador1_id = u3.id_usuario
                 JOIN usuarios u4 ON tp2.jugador2_id = u4.id_usuario
-                WHERE p.id_torneo = 37 AND p.categoria_id = 85
+                JOIN torneos_categorias tc ON p.categoria_id = tc.id
+                WHERE p.id_torneo = 37
                 ORDER BY p.fecha_hora
             """)
         ).fetchall()
@@ -106,6 +108,7 @@ def test_generar_fixture():
             j2_p1 = partido[7]
             j1_p2 = partido[8]
             j2_p2 = partido[9]
+            categoria_nombre = partido[10]
             
             dia_semana = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'][fecha_hora.weekday()]
             hora_mins = fecha_hora.hour * 60 + fecha_hora.minute
@@ -121,8 +124,8 @@ def test_generar_fixture():
                     fin_mins = int(hora_fin.split(':')[0]) * 60 + int(hora_fin.split(':')[1])
                     
                     if dia_semana in dias:
-                        if hora_mins < fin_mins and (hora_mins + 50) > inicio_mins:
-                            print(f"\n❌ VIOLACIÓN: {j1_p1}/{j2_p1} jugando {dia_semana} {fecha_hora.strftime('%H:%M')}")
+                        if hora_mins < fin_mins and (hora_mins + 70) > inicio_mins:
+                            print(f"\n❌ VIOLACIÓN [{categoria_nombre}]: {j1_p1}/{j2_p1} jugando {dia_semana} {fecha_hora.strftime('%H:%M')}")
                             print(f"   Restricción: NO puede {dia_semana} {hora_inicio}-{hora_fin}")
                             violaciones += 1
             
@@ -137,8 +140,8 @@ def test_generar_fixture():
                     fin_mins = int(hora_fin.split(':')[0]) * 60 + int(hora_fin.split(':')[1])
                     
                     if dia_semana in dias:
-                        if hora_mins < fin_mins and (hora_mins + 50) > inicio_mins:
-                            print(f"\n❌ VIOLACIÓN: {j1_p2}/{j2_p2} jugando {dia_semana} {fecha_hora.strftime('%H:%M')}")
+                        if hora_mins < fin_mins and (hora_mins + 70) > inicio_mins:
+                            print(f"\n❌ VIOLACIÓN [{categoria_nombre}]: {j1_p2}/{j2_p2} jugando {dia_semana} {fecha_hora.strftime('%H:%M')}")
                             print(f"   Restricción: NO puede {dia_semana} {hora_inicio}-{hora_fin}")
                             violaciones += 1
         

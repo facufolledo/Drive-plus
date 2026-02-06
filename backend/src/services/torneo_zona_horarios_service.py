@@ -14,7 +14,7 @@ from ..models.driveplus_models import Usuario
 class TorneoZonaHorariosService:
     """Servicio para generación de zonas considerando disponibilidad horaria"""
     
-    DURACION_PARTIDO_MINUTOS = 50
+    DURACION_PARTIDO_MINUTOS = 70
     
     @staticmethod
     def generar_zonas_con_horarios(
@@ -212,12 +212,12 @@ class TorneoZonaHorariosService:
             for franja in franjas:
                 desde = franja.get('desde', '08:00')
                 hasta = franja.get('hasta', '23:00')
-                # Generar slots cada 50 minutos
+                # Generar slots cada 70 minutos
                 hora_actual = TorneoZonaHorariosService._parse_hora(desde)
                 hora_fin = TorneoZonaHorariosService._parse_hora(hasta)
                 while hora_actual < hora_fin:
                     todos_slots.add((tipo_dia, hora_actual.strftime('%H:%M')))
-                    hora_actual += timedelta(minutes=50)
+                    hora_actual += timedelta(minutes=70)
         
         # Si la pareja no tiene restricciones, está disponible en todos los horarios
         if not disponibilidad_pareja:
@@ -248,7 +248,7 @@ class TorneoZonaHorariosService:
                 
                 while hora_actual < hora_limite:
                     restricciones.add((dia, hora_actual.strftime('%H:%M')))
-                    hora_actual += timedelta(minutes=50)
+                    hora_actual += timedelta(minutes=70)
         
         # Retornar slots disponibles = todos los slots - restricciones
         slots_disponibles = todos_slots - restricciones

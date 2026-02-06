@@ -22,7 +22,7 @@ class TorneoFixtureGlobalService:
     - No más partidos simultáneos que canchas disponibles
     """
     
-    DURACION_PARTIDO_MINUTOS = 50
+    DURACION_PARTIDO_MINUTOS = 70
     
     @staticmethod
     def generar_fixture_completo(
@@ -429,8 +429,8 @@ class TorneoFixtureGlobalService:
                     hora_limite = datetime.strptime(hora_hasta, '%H:%M')
                     
                     # IMPORTANTE: Asegurar que no se generen slots que excedan el límite
-                    # Restar 50 minutos del límite para que el partido termine antes del cierre
-                    hora_limite_ajustada = hora_limite - timedelta(minutes=50)
+                    # Restar 70 minutos del límite para que el partido termine antes del cierre
+                    hora_limite_ajustada = hora_limite - timedelta(minutes=70)
                     
                     while hora_actual <= hora_limite_ajustada:
                         slots.append((
@@ -438,7 +438,7 @@ class TorneoFixtureGlobalService:
                             dia_semana,
                             hora_actual.strftime('%H:%M')
                         ))
-                        hora_actual += timedelta(minutes=50)
+                        hora_actual += timedelta(minutes=70)
                 
                 fecha_actual += timedelta(days=1)
                 continue
@@ -452,8 +452,8 @@ class TorneoFixtureGlobalService:
                 hora_limite = datetime.strptime(hora_hasta, '%H:%M')
                 
                 # IMPORTANTE: Asegurar que no se generen slots que excedan el límite
-                # Restar 50 minutos del límite para que el partido termine antes del cierre
-                hora_limite_ajustada = hora_limite - timedelta(minutes=50)
+                # Restar 70 minutos del límite para que el partido termine antes del cierre
+                hora_limite_ajustada = hora_limite - timedelta(minutes=70)
                 
                 while hora_actual <= hora_limite_ajustada:
                     slots.append((
@@ -461,7 +461,7 @@ class TorneoFixtureGlobalService:
                         dia_semana,
                         hora_actual.strftime('%H:%M')
                     ))
-                    hora_actual += timedelta(minutes=50)
+                    hora_actual += timedelta(minutes=70)
             
             fecha_actual += timedelta(days=1)
         
@@ -738,11 +738,11 @@ class TorneoFixtureGlobalService:
         
         for inicio_mins, fin_mins in rangos_restringidos:
             # 🔴 FIX CRÍTICO: Verificar solapamiento correcto
-            # El partido dura 50 minutos: [hora_mins, hora_mins + 50]
+            # El partido dura 70 minutos: [hora_mins, hora_mins + 70]
             # La restricción es: [inicio_mins, fin_mins]
             # Hay solapamiento si: partido_inicio < restriccion_fin AND partido_fin > restriccion_inicio
             # Si el partido empieza EXACTAMENTE cuando termina la restricción, NO es conflicto
-            partido_fin = hora_mins + 50
+            partido_fin = hora_mins + 70
             
             # 🔴 CORRECCIÓN: Si el partido empieza ANTES que el fin de la restricción
             # Y el partido termina DESPUÉS del inicio de la restricción

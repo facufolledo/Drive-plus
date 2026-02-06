@@ -10,7 +10,7 @@ import random
 class SimuladorProgramacionHorarios:
     """Simula la programación de partidos respetando horarios"""
     
-    DURACION_PARTIDO_MINUTOS = 50
+    DURACION_PARTIDO_MINUTOS = 70
     
     def __init__(self):
         self.parejas = []

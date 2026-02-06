@@ -68,18 +68,15 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
           </motion.button>
           <motion.button 
             onClick={() => window.location.reload()}
-            className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer"
+            className="flex items-center hover:opacity-80 transition-opacity cursor-pointer"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
             <img 
               src={`${import.meta.env.BASE_URL}logo-drive.png`}
               alt="Drive+ Logo" 
-              className="w-8 h-8"
+              className="h-14 w-auto object-contain"
             />
-            <h1 className="text-2xl font-black text-textPrimary tracking-tight">
-              Drive<span className="text-primary">+</span>
-            </h1>
           </motion.button>
         </div>
 

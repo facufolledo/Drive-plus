@@ -754,7 +754,7 @@ def eliminar_categoria(
 @router.post("/{torneo_id}/inscribir", status_code=status.HTTP_201_CREATED)
 async def inscribir_pareja(
     torneo_id: int,
-    pareja_data: ParejaInscripcion,
+    request_body: dict,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user)
 ):
@@ -768,6 +768,15 @@ async def inscribir_pareja(
     from ..services.torneo_zona_service import TorneoZonaService
     from ..models.torneo_models import TorneoPareja
     
+    # Validar con Pydantic
+    try:
+        pareja_data = ParejaInscripcion(**request_body)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+    # Obtener disponibilidad del request original (Pydantic puede excluirla)
+    disponibilidad = request_body.get('disponibilidad_horaria')
+    
     try:
         user_id = current_user.id_usuario
         
@@ -778,15 +787,15 @@ async def inscribir_pareja(
             # ORGANIZADOR: Inscripción directa y confirmada
             pareja = TorneoPareja(
                 torneo_id=torneo_id,
-                categoria_id=getattr(pareja_data, 'categoria_id', None),
+                categoria_id=pareja_data.categoria_id,
                 jugador1_id=pareja_data.jugador1_id,
                 jugador2_id=pareja_data.jugador2_id,
-                estado='confirmada',  # Directamente confirmada
+                estado='confirmada',
                 confirmado_jugador1=True,
-                confirmado_jugador2=True,  # Ambos confirmados automáticamente
+                confirmado_jugador2=True,
                 creado_por_id=user_id,
                 observaciones=pareja_data.observaciones,
-                disponibilidad_horaria=getattr(pareja_data, 'disponibilidad_horaria', None)
+                disponibilidad_horaria=disponibilidad
             )
             db.add(pareja)
             db.commit()
@@ -805,10 +814,10 @@ async def inscribir_pareja(
                 torneo_id=torneo_id,
                 jugador1_id=pareja_data.jugador1_id,
                 jugador2_id=pareja_data.jugador2_id,
-                categoria_id=getattr(pareja_data, 'categoria_id', None),
+                categoria_id=pareja_data.categoria_id,
                 creador_id=user_id,
                 observaciones=pareja_data.observaciones,
-                disponibilidad_horaria=getattr(pareja_data, 'disponibilidad_horaria', None)
+                disponibilidad_horaria=disponibilidad
             )
             
             # Obtener info del torneo para datos de pago
@@ -961,7 +970,7 @@ def listar_parejas(
         if not parejas:
             return []
         
-        # PRE-CARGAR perfiles y categorías (optimización)
+        # PRE-CARGAR perfiles, usuarios y categorías (optimización)
         jugadores_ids = set()
         categoria_ids = set()
         for p in parejas:
@@ -970,10 +979,18 @@ def listar_parejas(
             if p.categoria_id:
                 categoria_ids.add(p.categoria_id)
         
+        # Cargar perfiles
         perfiles = db.query(PerfilUsuario).filter(
             PerfilUsuario.id_usuario.in_(jugadores_ids)
         ).all()
         perfiles_dict = {p.id_usuario: p for p in perfiles}
+        
+        # Cargar usuarios para obtener nombre_usuario
+        from ..models.driveplus_models import Usuario
+        usuarios = db.query(Usuario).filter(
+            Usuario.id_usuario.in_(jugadores_ids)
+        ).all()
+        usuarios_dict = {u.id_usuario: u for u in usuarios}
         
         categorias = db.query(TorneoCategoria).filter(
             TorneoCategoria.id.in_(categoria_ids)
@@ -984,6 +1001,8 @@ def listar_parejas(
         for pareja in parejas:
             perfil1 = perfiles_dict.get(pareja.jugador1_id)
             perfil2 = perfiles_dict.get(pareja.jugador2_id)
+            usuario1 = usuarios_dict.get(pareja.jugador1_id)
+            usuario2 = usuarios_dict.get(pareja.jugador2_id)
             categoria = categorias_dict.get(pareja.categoria_id) if pareja.categoria_id else None
             
             jugador1_nombre = f"{perfil1.nombre} {perfil1.apellido}" if perfil1 else f"Usuario {pareja.jugador1_id}"
@@ -1000,6 +1019,8 @@ def listar_parejas(
                 "jugador2_id": pareja.jugador2_id,
                 "jugador1_nombre": jugador1_nombre,
                 "jugador2_nombre": jugador2_nombre,
+                "jugador1_username": usuario1.nombre_usuario if usuario1 else None,
+                "jugador2_username": usuario2.nombre_usuario if usuario2 else None,
                 "nombre_pareja": f"{jugador1_nombre} / {jugador2_nombre}",
                 "estado": pareja.estado.value if hasattr(pareja.estado, 'value') else str(pareja.estado).replace('EstadoPareja.', '').lower(),
                 "categoria_asignada": pareja.categoria_asignada,
@@ -2249,7 +2270,7 @@ def listar_slots(
 class ProgramacionParams(BaseModel):
     fecha_inicio: Optional[str] = None
     fecha_fin: Optional[str] = None
-    duracion_partido_minutos: int = 90
+    duracion_partido_minutos: int = 70
     # Horarios para días de semana (Lun-Vie)
     hora_inicio_semana: Optional[str] = "17:00"
     hora_fin_semana: Optional[str] = "22:00"
@@ -2328,7 +2349,7 @@ def programar_partidos_automatico(
     Parámetros opcionales en body:
     - fecha_inicio: Fecha de inicio para crear slots
     - fecha_fin: Fecha de fin para crear slots
-    - duracion_partido_minutos: Duración de cada partido (default: 90)
+    - duracion_partido_minutos: Duración de cada partido (default: 70)
     - hora_inicio_semana/hora_fin_semana: Horarios Lun-Vie (default: 17:00-22:00)
     - hora_inicio_finde/hora_fin_finde: Horarios Sab-Dom (default: 09:00-21:00)
     """
@@ -2340,7 +2361,7 @@ def programar_partidos_automatico(
     # Extraer parámetros del body si existen
     fecha_inicio = params.fecha_inicio if params else None
     fecha_fin = params.fecha_fin if params else None
-    duracion_minutos = params.duracion_partido_minutos if params else 90
+    duracion_minutos = params.duracion_partido_minutos if params else 70
     hora_inicio_semana = params.hora_inicio_semana if params else "17:00"
     hora_fin_semana = params.hora_fin_semana if params else "22:00"
     hora_inicio_finde = params.hora_inicio_finde if params else "09:00"
