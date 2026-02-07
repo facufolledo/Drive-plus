@@ -7,6 +7,7 @@ import { AuthProvider } from './context/AuthContext';
 import { SalasProvider } from './context/SalasContext';
 import { TorneosProvider } from './context/TorneosContext';
 import { PWAInstallBanner } from './components/PWAInstallBanner';
+import { PWAUpdateBanner } from './components/PWAUpdateBanner';
 
 // Páginas críticas (carga inmediata)
 import Landing from './pages/Landing';
@@ -273,6 +274,7 @@ function App() {
               </Suspense>
               
               {/* PWA Install Banner */}
+              <PWAUpdateBanner />
               <PWAInstallBanner />
           </TorneosProvider>
         </SalasProvider>

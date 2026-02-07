@@ -1,19 +1,16 @@
 /**
  * Service Worker para Drive+
  * Maneja cache de assets, offline fallback y background sync
+ * IMPORTANTE: No cachear index.html ni / para evitar pantalla en blanco y logo viejo.
  */
 
-const CACHE_VERSION = 'drive-plus-v1';
+const CACHE_VERSION = 'drive-plus-v2';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 const IMAGE_CACHE = `${CACHE_VERSION}-images`;
 
-// Assets estáticos para cachear
+// Solo assets que no cambian con cada deploy (index.html y / NUNCA aquí)
 const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/logo-drive.png',
   '/offline.html'
 ];
 
@@ -48,10 +45,10 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
       .then(keys => {
-        // Eliminar caches antiguos
+        // Eliminar TODOS los caches antiguos (incl. v1) para forzar contenido nuevo
         return Promise.all(
           keys
-            .filter(key => key.startsWith('drive-plus-') && key !== STATIC_CACHE && key !== DYNAMIC_CACHE && key !== IMAGE_CACHE)
+            .filter(key => key.startsWith('drive-plus-'))
             .map(key => {
               console.log('🗑️ Service Worker: Deleting old cache:', key);
               return caches.delete(key);
@@ -74,6 +71,21 @@ self.addEventListener('fetch', (event) => {
 
   // Ignorar peticiones a otros dominios (excepto APIs conocidas)
   if (url.origin !== location.origin && !url.origin.includes('railway.app')) {
+    return;
+  }
+
+  // CRÍTICO: Navegación/documento (/, index.html) → siempre red, NUNCA cache
+  // Evita pantalla en blanco y logo viejo tras un deploy
+  if (request.mode === 'navigate' || request.destination === 'document') {
+    event.respondWith(
+      fetch(request).catch(() => caches.match('/offline.html') || new Response('Sin conexión', { status: 503 }))
+    );
+    return;
+  }
+
+  // manifest.json y logo: network-first para que se actualicen sin hard refresh
+  if (url.pathname === '/manifest.json' || url.pathname === '/logo-drive.png') {
+    event.respondWith(networkFirstStrategy(request, DYNAMIC_CACHE));
     return;
   }
 

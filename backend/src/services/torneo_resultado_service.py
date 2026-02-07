@@ -199,13 +199,15 @@ class TorneoResultadoService:
         partido_siguiente = db.query(Partido).filter(
             Partido.id_torneo == partido.id_torneo,
             Partido.fase == siguiente_fase,
-            Partido.numero_partido == numero_siguiente
+            Partido.numero_partido == numero_siguiente,
+            Partido.categoria_id == partido.categoria_id
         ).first()
         
-        # Si no existe el partido de siguiente fase, crearlo
+        # Si no existe el partido de siguiente fase, crearlo (poco habitual; el bracket ya los crea)
         if not partido_siguiente:
             partido_siguiente = Partido(
                 id_torneo=partido.id_torneo,
+                categoria_id=partido.categoria_id,
                 fase=siguiente_fase,
                 numero_partido=numero_siguiente,
                 estado='pendiente',

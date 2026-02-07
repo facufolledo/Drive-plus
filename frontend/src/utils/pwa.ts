@@ -18,10 +18,12 @@ export const registerServiceWorker = async (): Promise<void> => {
       
       logger.log('✅ Service Worker registrado:', registration.scope);
 
-      // Verificar actualizaciones cada hora
-      setInterval(() => {
-        registration.update();
-      }, 60 * 60 * 1000);
+      // Verificar actualizaciones al volver a la pestaña (evita cache viejo)
+      const checkUpdate = () => registration.update();
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') checkUpdate();
+      });
+      setInterval(checkUpdate, 30 * 60 * 1000);
 
       // Escuchar actualizaciones
       registration.addEventListener('updatefound', () => {

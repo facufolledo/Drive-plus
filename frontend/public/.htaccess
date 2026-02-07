@@ -65,7 +65,14 @@ Options -Indexes
   
   <FilesMatch "\.(html|htm)$">
     Header set Cache-Control "max-age=0, no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
   </FilesMatch>
+  <Files "index.html">
+    Header set Cache-Control "max-age=0, no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+  </Files>
 </IfModule>
 
 # Tipos MIME para PWA

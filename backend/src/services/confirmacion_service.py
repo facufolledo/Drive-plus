@@ -363,42 +363,40 @@ class ConfirmacionService:
         jugadores_equipoA = jugadores_resultado.get('equipoA', [])
         jugadores_equipoB = jugadores_resultado.get('equipoB', [])
         
+        # Calcular games totales desde detalle_sets (ANTES de usarlos en el if/else)
+        games_a = sum(set_data.get('juegos_eq1', 0) for set_data in resultado_db.detalle_sets)
+        games_b = sum(set_data.get('juegos_eq2', 0) for set_data in resultado_db.detalle_sets)
+        
         # Determinar si equipo1 corresponde a equipoA o equipoB
         equipo1_es_equipoA = False
-        
         if jugadores_equipoA and equipo1:
-            # Verificar si algún jugador de equipo1 está en equipoA
             ids_equipo1 = {j.id_usuario for j in equipo1}
             ids_equipoA = {j.get('id') for j in jugadores_equipoA if j.get('id')}
             equipo1_es_equipoA = bool(ids_equipo1.intersection(ids_equipoA))
         
-        # Asignar sets correctamente según la correspondencia
+        # Asignar sets y games según la correspondencia
         if equipo1_es_equipoA:
-            # equipo1 = equipoA, equipo2 = equipoB
-            sets_equipo1 = resultado_db.sets_eq1  # sets de equipoA
-            sets_equipo2 = resultado_db.sets_eq2  # sets de equipoB
+            sets_equipo1 = resultado_db.sets_eq1
+            sets_equipo2 = resultado_db.sets_eq2
             games_equipo1 = games_a
             games_equipo2 = games_b
         else:
-            # equipo1 = equipoB, equipo2 = equipoA (INVERTIDO)
-            sets_equipo1 = resultado_db.sets_eq2  # sets de equipoB
-            sets_equipo2 = resultado_db.sets_eq1  # sets de equipoA
+            sets_equipo1 = resultado_db.sets_eq2
+            sets_equipo2 = resultado_db.sets_eq1
             games_equipo1 = games_b
             games_equipo2 = games_a
         
-        # Calcular games totales desde detalle_sets
-        games_a = sum(set_data.get('juegos_eq1', 0) for set_data in resultado_db.detalle_sets)
-        games_b = sum(set_data.get('juegos_eq2', 0) for set_data in resultado_db.detalle_sets)
-        
-        # Convertir detalle_sets al formato que espera el servicio Elo
-        sets_detail = [
-            {
-                'gamesEquipoA': set_data.get('juegos_eq1', 0),
-                'gamesEquipoB': set_data.get('juegos_eq2', 0),
-                'ganador': 'equipoA' if set_data.get('juegos_eq1', 0) > set_data.get('juegos_eq2', 0) else 'equipoB'
-            }
-            for set_data in resultado_db.detalle_sets
-        ]
+        # EloService espera sets_detail con keys 'games_a' y 'games_b' (team_a = equipo1, team_b = equipo2)
+        if equipo1_es_equipoA:
+            sets_detail = [
+                {'games_a': set_data.get('juegos_eq1', 0), 'games_b': set_data.get('juegos_eq2', 0)}
+                for set_data in resultado_db.detalle_sets
+            ]
+        else:
+            sets_detail = [
+                {'games_a': set_data.get('juegos_eq2', 0), 'games_b': set_data.get('juegos_eq1', 0)}
+                for set_data in resultado_db.detalle_sets
+            ]
         
         # Calcular Elo usando el servicio existente (CORREGIDO)
         elo_service = EloService()

@@ -98,8 +98,9 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
         const rect2 = match2Ref?.getBoundingClientRect();
         const rectNext = nextMatchRef.getBoundingClientRect();
 
-        // Posiciones relativas al container
+        // Posiciones relativas al container (x2 para que la línea salga del segundo partido/bye)
         const x1 = rect1.right - containerRect.left;
+        const x2 = rect2 ? rect2.right - containerRect.left : x1;
         const y1 = rect1.top + rect1.height / 2 - containerRect.top;
         const y2 = rect2 ? rect2.top + rect2.height / 2 - containerRect.top : y1;
         const x3 = rectNext.left - containerRect.left;
@@ -121,13 +122,12 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
           />
         );
 
-        // Si hay match2
+        // Si hay match2 (o BYE): línea desde el borde derecho del segundo recuadro
         if (rect2) {
-          // Línea 2: horizontal desde match2 hacia xMid
           newLines.push(
             <path
               key={`l2-${faseActual}-${i}`}
-              d={`M ${x1} ${y2} H ${xMid}`}
+              d={`M ${x2} ${y2} H ${xMid}`}
               stroke={lineColor}
               strokeWidth={lineWidth}
               fill="none"

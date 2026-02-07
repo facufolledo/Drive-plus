@@ -122,16 +122,16 @@ class EloConfig:
     
     # === NUEVO: CAPS POR CATEGORÍA DE ORIGEN ===
     
-    # Caps específicos según la categoría de origen del jugador
-    # Basados en el rango de cada categoría para balancear la progresión
+    # Caps específicos según la categoría de origen del jugador.
+    # Máximo ~35-50 por partido para que ganancias tipo +109 no ocurran.
     CATEGORY_ORIGIN_CAPS = {
-        "Principiante": {"win": 350, "loss": -175},  # Rango de 500 pts (aumentado)
-        "8va": {"win": 350, "loss": -175},           # Rango de 500 pts (aumentado)
-        "7ma": {"win": 50, "loss": -25},             # Rango de 200 pts (reducido a 50)
-        "6ta": {"win": 50, "loss": -25},             # Rango de 200 pts (reducido a 50)
-        "5ta": {"win": 50, "loss": -25},             # Rango de 200 pts (reducido a 50)
-        "4ta": {"win": 50, "loss": -25},             # Rango de 200 pts (reducido a 50)
-        "Libre": {"win": 40, "loss": -20}            # Categoría máxima (reducido a 40)
+        "Principiante": {"win": 50, "loss": -25},
+        "8va": {"win": 50, "loss": -25},
+        "7ma": {"win": 50, "loss": -25},
+        "6ta": {"win": 50, "loss": -25},
+        "5ta": {"win": 50, "loss": -25},
+        "4ta": {"win": 50, "loss": -25},
+        "Libre": {"win": 40, "loss": -20}
     }
     
     # === NUEVO: INACTIVIDAD ===
