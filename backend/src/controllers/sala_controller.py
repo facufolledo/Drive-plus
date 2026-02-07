@@ -174,26 +174,31 @@ async def obtener_sala(
             detail="Sala no encontrada"
         )
     
-    # Obtener jugadores
+    # Obtener jugadores (batch: evitar N+1)
     jugadores_sala = db.query(SalaJugador).filter(
         SalaJugador.id_sala == sala_id
     ).order_by(SalaJugador.orden).all()
     
     jugadores = []
-    for sj in jugadores_sala:
-        usuario = db.query(Usuario).filter(Usuario.id_usuario == sj.id_usuario).first()
-        perfil = db.query(PerfilUsuario).filter(PerfilUsuario.id_usuario == sj.id_usuario).first()
-        
-        if usuario:
-            jugadores.append({
-                "id_usuario": usuario.id_usuario,
-                "nombre_usuario": usuario.nombre_usuario,
-                "nombre": perfil.nombre if perfil else "",
-                "apellido": perfil.apellido if perfil else "",
-                "rating": usuario.rating,
-                "equipo": sj.equipo,
-                "orden": sj.orden
-            })
+    if jugadores_sala:
+        ids_usuario = [sj.id_usuario for sj in jugadores_sala]
+        usuarios = db.query(Usuario).filter(Usuario.id_usuario.in_(ids_usuario)).all()
+        perfiles = db.query(PerfilUsuario).filter(PerfilUsuario.id_usuario.in_(ids_usuario)).all()
+        usuarios_dict = {u.id_usuario: u for u in usuarios}
+        perfiles_dict = {p.id_usuario: p for p in perfiles}
+        for sj in jugadores_sala:
+            usuario = usuarios_dict.get(sj.id_usuario)
+            perfil = perfiles_dict.get(sj.id_usuario)
+            if usuario:
+                jugadores.append({
+                    "id_usuario": usuario.id_usuario,
+                    "nombre_usuario": usuario.nombre_usuario,
+                    "nombre": perfil.nombre if perfil else "",
+                    "apellido": perfil.apellido if perfil else "",
+                    "rating": usuario.rating,
+                    "equipo": sj.equipo,
+                    "orden": sj.orden
+                })
     
     # Obtener resultado del partido si existe
     from ..models.driveplus_models import Partido, ResultadoPartido
@@ -972,30 +977,34 @@ async def obtener_confirmaciones_pendientes(
         )
     ).all()
     
-    # Obtener salas asociadas
+    if not partidos_pendientes:
+        return {"pendientes": [], "total": 0}
+    
+    partidos_ids_pend = [p.id_partido for p in partidos_pendientes]
+    partidos_dict = {p.id_partido: p for p in partidos_pendientes}
+    
+    # Batch: salas por id_partido y confirmaciones del usuario
+    salas = db.query(Sala).filter(Sala.id_partido.in_(partidos_ids_pend)).all()
+    salas_por_partido = {s.id_partido: s for s in salas}
+    confirmaciones = db.query(Confirmacion.id_partido).filter(
+        Confirmacion.id_partido.in_(partidos_ids_pend),
+        Confirmacion.id_usuario == current_user.id_usuario
+    ).all()
+    partidos_ya_confirmados = {c.id_partido for c in confirmaciones}
+    
     resultado = []
-    for partido in partidos_pendientes:
-        sala = db.query(Sala).filter(Sala.id_partido == partido.id_partido).first()
-        
-        if sala:
-            # Verificar si ya confirmó
-            from ..models.confirmacion import Confirmacion
-            ya_confirmo = db.query(Confirmacion).filter(
-                and_(
-                    Confirmacion.id_partido == partido.id_partido,
-                    Confirmacion.id_usuario == current_user.id_usuario
-                )
-            ).first() is not None
-            
-            if not ya_confirmo:  # Solo mostrar si no ha confirmado
-                resultado.append({
-                    "id_sala": sala.id_sala,
-                    "nombre": sala.nombre,
-                    "fecha": sala.fecha,
-                    "id_partido": partido.id_partido,
-                    "resultado": partido.resultado_padel,
-                    "ganador_equipo": partido.ganador_equipo
-                })
+    for partido_id in partidos_ids_pend:
+        partido = partidos_dict.get(partido_id)
+        sala = salas_por_partido.get(partido_id)
+        if sala and partido_id not in partidos_ya_confirmados:
+            resultado.append({
+                "id_sala": sala.id_sala,
+                "nombre": sala.nombre,
+                "fecha": sala.fecha,
+                "id_partido": partido.id_partido,
+                "resultado": partido.resultado_padel,
+                "ganador_equipo": partido.ganador_equipo
+            })
     
     return {
         "pendientes": resultado,

@@ -322,13 +322,14 @@ class TorneoZonaService:
             TorneoZonaPareja.zona_id == zona_id
         ).all()
         
-        # Inicializar estadísticas para todas las parejas (existentes y eliminadas)
+        # Batch cargar parejas (evitar N+1)
+        parejas_ids = [a.pareja_id for a in asignaciones]
+        parejas = db.query(TorneoPareja).filter(TorneoPareja.id.in_(parejas_ids)).all()
+        parejas_dict = {p.id: p for p in parejas}
+        
         tabla = []
         for asignacion in asignaciones:
-            pareja = db.query(TorneoPareja).filter(
-                TorneoPareja.id == asignacion.pareja_id
-            ).first()
-            
+            pareja = parejas_dict.get(asignacion.pareja_id)
             if pareja:
                 # Pareja existe
                 tabla.append({
@@ -485,6 +486,65 @@ class TorneoZonaService:
             'tabla': tabla
         }
     
+    @staticmethod
+    def crear_zona_ultimo_momento(
+        db: Session,
+        torneo_id: int,
+        categoria_id: int,
+        nombre: str,
+        pareja_ids: List[int],
+        user_id: int
+    ):
+        """
+        Crea una zona nueva en una categoría y asigna las parejas indicadas.
+        Para zonas de último momento (ej. 2 parejas que se inscriben tarde).
+        Las parejas deben ser de esa categoría; si ya están en otra zona, se las mueve.
+        """
+        from ..models.torneo_models import TorneoCategoria
+
+        if not TorneoZonaService._es_organizador(db, torneo_id, user_id):
+            raise ValueError("No tienes permisos para crear zonas")
+        if len(pareja_ids) < 2:
+            raise ValueError("La zona debe tener al menos 2 parejas")
+        cat = db.query(TorneoCategoria).filter(
+            TorneoCategoria.id == categoria_id,
+            TorneoCategoria.torneo_id == torneo_id
+        ).first()
+        if not cat:
+            raise ValueError("Categoría no encontrada")
+
+        # Siguiente numero_orden para esta categoría
+        max_orden = db.query(func.coalesce(func.max(TorneoZona.numero_orden), 0)).filter(
+            TorneoZona.torneo_id == torneo_id,
+            TorneoZona.categoria_id == categoria_id
+        ).scalar()
+        zona = TorneoZona(
+            torneo_id=torneo_id,
+            categoria_id=categoria_id,
+            nombre=nombre.strip() or "Zona último momento",
+            numero_orden=int(max_orden) + 1,
+        )
+        db.add(zona)
+        db.flush()
+
+        # Quitar parejas de cualquier zona anterior (mover a la nueva)
+        db.query(TorneoZonaPareja).filter(
+            TorneoZonaPareja.pareja_id.in_(pareja_ids)
+        ).delete(synchronize_session=False)
+
+        for pid in pareja_ids:
+            pareja = db.query(TorneoPareja).filter(
+                TorneoPareja.id == pid,
+                TorneoPareja.torneo_id == torneo_id,
+                TorneoPareja.categoria_id == categoria_id
+            ).first()
+            if not pareja:
+                raise ValueError(f"Pareja {pid} no encontrada o no pertenece a esta categoría")
+            db.add(TorneoZonaPareja(zona_id=zona.id, pareja_id=pid))
+        db.commit()
+        db.refresh(zona)
+        return zona
+
     @staticmethod
     def mover_pareja_entre_zonas(
         db: Session,

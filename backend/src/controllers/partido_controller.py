@@ -98,27 +98,27 @@ async def listar_partidos(
     
     partidos = query.order_by(Partido.fecha.desc()).limit(limit).all()
     
-    # Construir respuesta completa
+    if not partidos:
+        return []
+    
+    partido_ids = [p.id_partido for p in partidos]
+    # Batch: jugadores, resultados, clubs, creadores (evitar N+1)
+    todos_jugadores = db.query(PartidoJugador).filter(PartidoJugador.id_partido.in_(partido_ids)).all()
+    resultados = db.query(ResultadoPartido).filter(ResultadoPartido.id_partido.in_(partido_ids)).all()
+    club_ids = list({p.id_club for p in partidos if p.id_club})
+    creador_ids = list({p.id_creador for p in partidos if p.id_creador})
+    clubs = db.query(Club).filter(Club.id_club.in_(club_ids)).all() if club_ids else []
+    creadores = db.query(Usuario).filter(Usuario.id_usuario.in_(creador_ids)).all() if creador_ids else []
+    
+    resultados_dict = {r.id_partido: r for r in resultados}
+    clubs_dict = {c.id_club: c for c in clubs}
+    creadores_dict = {u.id_usuario: u for u in creadores}
+    
     partidos_completos = []
     for partido in partidos:
-        # Obtener jugadores
-        jugadores = db.query(PartidoJugador).filter(
-            PartidoJugador.id_partido == partido.id_partido
-        ).all()
-        
-        # Obtener resultado si existe
-        resultado = db.query(ResultadoPartido).filter(
-            ResultadoPartido.id_partido == partido.id_partido
-        ).first()
-        
-        # Obtener club si existe
-        club = None
-        if partido.id_club:
-            club = db.query(Club).filter(Club.id_club == partido.id_club).first()
-        
-        # Obtener creador
-        creador = db.query(Usuario).filter(Usuario.id_usuario == partido.id_creador).first()
-        
+        resultado = resultados_dict.get(partido.id_partido)
+        club = clubs_dict.get(partido.id_club) if partido.id_club else None
+        creador = creadores_dict.get(partido.id_creador) if partido.id_creador else None
         partidos_completos.append(PartidoCompleto(
             id_partido=partido.id_partido,
             fecha=partido.fecha,
@@ -469,10 +469,13 @@ async def calcular_elo_partido(
                 detail="Cada equipo debe tener exactamente 2 jugadores"
             )
         
-        # Obtener información de los jugadores
+        # Obtener información de los jugadores (batch, evitar N+1)
+        ids_jugadores = [j.id_usuario for j in jugadores_partido]
+        usuarios = db.query(Usuario).filter(Usuario.id_usuario.in_(ids_jugadores)).all()
+        usuarios_dict = {u.id_usuario: u for u in usuarios}
         jugadores_info = {}
         for jugador in jugadores_partido:
-            usuario = db.query(Usuario).filter(Usuario.id_usuario == jugador.id_usuario).first()
+            usuario = usuarios_dict.get(jugador.id_usuario)
             if usuario:
                 jugadores_info[jugador.id_usuario] = {
                     'usuario': usuario,

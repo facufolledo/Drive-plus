@@ -234,11 +234,21 @@ async def listar_pagos_pendientes(
         TorneoPareja.pago_estado == 'pagado'
     ).all()
     
+    if not parejas:
+        return {"total": 0, "parejas": []}
+    
+    # Batch perfiles (evitar N+1)
+    jugador_ids = set()
+    for p in parejas:
+        jugador_ids.add(p.jugador1_id)
+        jugador_ids.add(p.jugador2_id)
+    perfiles = db.query(PerfilUsuario).filter(PerfilUsuario.id_usuario.in_(jugador_ids)).all()
+    perfiles_dict = {pr.id_usuario: pr for pr in perfiles}
+    
     resultado = []
     for pareja in parejas:
-        perfil1 = db.query(PerfilUsuario).filter(PerfilUsuario.id_usuario == pareja.jugador1_id).first()
-        perfil2 = db.query(PerfilUsuario).filter(PerfilUsuario.id_usuario == pareja.jugador2_id).first()
-        
+        perfil1 = perfiles_dict.get(pareja.jugador1_id)
+        perfil2 = perfiles_dict.get(pareja.jugador2_id)
         resultado.append({
             "pareja_id": pareja.id,
             "jugador1_nombre": f"{perfil1.nombre} {perfil1.apellido}" if perfil1 else f"Usuario {pareja.jugador1_id}",

@@ -264,7 +264,6 @@ class TorneoService {
     const response = await axios.get(`${API_URL}/torneos/${torneoId}/parejas`, {
       params: { estado, categoria_id: categoriaId },
     });
-    console.log('🔍 SERVICE - Respuesta del backend (primeras 2 parejas):', response.data.slice(0, 2));
     return response.data;
   }
 
@@ -365,6 +364,29 @@ class TorneoService {
     return response.data;
   }
 
+  /** Crea una zona de último momento y asigna parejas. Solo antes de playoffs. */
+  async crearZonaUltimoMomento(
+    torneoId: number,
+    data: { categoria_id: number; nombre: string; pareja_ids: number[] }
+  ): Promise<{ zona: { id: number; nombre: string }; message: string }> {
+    const response = await axios.post(
+      `${API_URL}/torneos/${torneoId}/zonas`,
+      data,
+      this.getAuthHeaders()
+    );
+    return response.data;
+  }
+
+  /** Genera solo los partidos (round-robin) de una zona. Quedan sin programar. */
+  async generarPartidosZona(torneoId: number, zonaId: number): Promise<{ partidos_creados: number; message: string }> {
+    const response = await axios.post(
+      `${API_URL}/torneos/${torneoId}/zonas/${zonaId}/generar-partidos`,
+      {},
+      this.getAuthHeaders()
+    );
+    return response.data;
+  }
+
   async eliminarFixture(torneoId: number, categoriaId?: number): Promise<any> {
     const config = this.getAuthHeaders();
     if (categoriaId !== undefined && categoriaId !== null) {
@@ -387,8 +409,34 @@ class TorneoService {
     return response.data;
   }
 
+  /** Zonas + tablas en una sola petición (más rápido que listarZonas + N obtenerTablaPosiciones). */
+  async listarZonasConTablas(torneoId: number): Promise<{ zonas: any[]; tablas: any[] }> {
+    if (!torneoId || isNaN(torneoId) || torneoId <= 0) {
+      return { zonas: [], tablas: [] };
+    }
+    const response = await axios.get(`${API_URL}/torneos/${torneoId}/zonas/tablas`);
+    return response.data;
+  }
+
   async obtenerTablaPosiciones(torneoId: number, zonaId: number): Promise<any> {
     const response = await axios.get(`${API_URL}/torneos/${torneoId}/zonas/${zonaId}/tabla`);
+    return response.data;
+  }
+
+  /** Mueve una pareja de su zona actual a otra zona (misma categoría). Solo organizadores. */
+  async moverParejaEntreZonas(
+    torneoId: number,
+    parejaId: number,
+    zonaDestinoId: number
+  ): Promise<{ message: string }> {
+    const response = await axios.post(
+      `${API_URL}/torneos/${torneoId}/zonas/mover-pareja`,
+      null,
+      {
+        ...this.getAuthHeaders(),
+        params: { pareja_id: parejaId, zona_destino_id: zonaDestinoId },
+      }
+    );
     return response.data;
   }
 

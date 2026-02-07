@@ -68,9 +68,9 @@ export default function TorneoPlayoffs({ torneoId, esOrganizador }: TorneoPlayof
 
     try {
       setLoading(true);
-      // Cargar todos los playoffs (sin filtro en el backend para cachear)
-      const data = await torneoService.listarPlayoffs(torneoId);
-      const partidosData = Array.isArray(data) ? data : (data as any)?.partidos || [];
+      // Lista plana con categoria_id (incluye partidos BYE y todas las fases)
+      const res = await torneoService.listarPartidosPlayoffs(torneoId);
+      const partidosData = (res?.partidos && Array.isArray(res.partidos)) ? res.partidos : [];
       
       // Guardar en cache
       playoffsCache[torneoId] = {
@@ -78,10 +78,14 @@ export default function TorneoPlayoffs({ torneoId, esOrganizador }: TorneoPlayof
         timestamp: Date.now()
       };
       
-      // Filtrar por categoría
-      const partidosFiltrados = categoriaFiltro 
-        ? partidosData.filter((p: any) => p.categoria_id === categoriaFiltro)
-        : partidosData;
+      // Filtrar por categoría; si "Todas", mostrar la primera categoría que tenga partidos
+      let partidosFiltrados = partidosData;
+      if (categoriaFiltro) {
+        partidosFiltrados = partidosData.filter((p: any) => p.categoria_id === categoriaFiltro);
+      } else if (partidosData.length > 0) {
+        const primeraCategoriaId = partidosData[0].categoria_id;
+        partidosFiltrados = partidosData.filter((p: any) => p.categoria_id === primeraCategoriaId);
+      }
       
       setPartidos(partidosFiltrados);
       setPlayoffsGenerados(partidosFiltrados.length > 0);

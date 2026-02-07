@@ -265,16 +265,21 @@ def listar_torneos(
         # Usar created_at en lugar de fecha_inicio para el ordenamiento
         torneos = query.order_by(Torneo.created_at.desc()).offset(skip).limit(limit).all()
         
-        # Convertir a formato simple para evitar problemas de serialización
+        # Conteo de parejas en una sola query (evitar N+1)
+        from ..models.torneo_models import TorneoPareja
+        from sqlalchemy import func
+        torneo_ids = [t.id for t in torneos]
+        parejas_por_torneo = {}
+        if torneo_ids:
+            counts = db.query(TorneoPareja.torneo_id, func.count(TorneoPareja.id)).filter(
+                TorneoPareja.torneo_id.in_(torneo_ids),
+                TorneoPareja.estado.in_(['inscripta', 'confirmada'])
+            ).group_by(TorneoPareja.torneo_id).all()
+            parejas_por_torneo = {tid: c for tid, c in counts}
+        
         resultado = []
         for torneo in torneos:
-            # Contar parejas inscritas correctamente
-            from ..models.torneo_models import TorneoPareja
-            parejas_count = db.query(TorneoPareja).filter(
-                TorneoPareja.torneo_id == torneo.id,
-                TorneoPareja.estado.in_(['inscripta', 'confirmada'])
-            ).count()
-            
+            parejas_count = parejas_por_torneo.get(torneo.id, 0)
             resultado.append({
                 "id": torneo.id,
                 "nombre": torneo.nombre,
@@ -655,16 +660,20 @@ def listar_categorias(
             TorneoCategoria.torneo_id == torneo_id
         ).order_by(TorneoCategoria.orden).all()
         
+        # Conteo de parejas por categoría en una sola query (evitar N+1)
+        from sqlalchemy import func
+        cat_ids = [c.id for c in categorias]
+        parejas_por_cat = {}
+        if cat_ids:
+            counts = db.query(TorneoPareja.categoria_id, func.count(TorneoPareja.id)).filter(
+                TorneoPareja.categoria_id.in_(cat_ids),
+                TorneoPareja.estado.in_(['inscripta', 'confirmada'])
+            ).group_by(TorneoPareja.categoria_id).all()
+            parejas_por_cat = {cid: c for cid, c in counts}
+        
         resultado = []
         for cat in categorias:
-            try:
-                parejas_count = db.query(TorneoPareja).filter(
-                    TorneoPareja.categoria_id == cat.id,
-                    TorneoPareja.estado.in_(['inscripta', 'confirmada'])
-                ).count()
-            except Exception:
-                parejas_count = 0  # Si falla el conteo, usar 0
-            
+            parejas_count = parejas_por_cat.get(cat.id, 0)
             resultado.append({
                 "id": cat.id,
                 "torneo_id": cat.torneo_id,
@@ -1345,6 +1354,56 @@ def eliminar_zonas(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/{torneo_id}/zonas/tablas")
+def listar_zonas_con_tablas(
+    torneo_id: int,
+    db: Session = Depends(get_db)
+):
+    """Lista todas las zonas del torneo con sus tablas de posiciones en una sola respuesta (evita N+1 requests desde el front)."""
+    from ..services.torneo_zona_service import TorneoZonaService
+    from ..models.driveplus_models import PerfilUsuario
+
+    try:
+        zonas = TorneoZonaService.listar_zonas(db, torneo_id)
+        if not zonas:
+            return {"zonas": [], "tablas": []}
+
+        tablas_result = []
+        jugadores_ids = set()
+        for z in zonas:
+            tabla = TorneoZonaService.obtener_tabla_posiciones(db, z["id"])
+            for item in tabla.get("tabla", []):
+                if item.get("jugador1_id"):
+                    jugadores_ids.add(item["jugador1_id"])
+                if item.get("jugador2_id"):
+                    jugadores_ids.add(item["jugador2_id"])
+            tablas_result.append({
+                "zona_id": z["id"],
+                "zona_nombre": z["nombre"],
+                "categoria_id": z.get("categoria_id"),
+                "tabla": tabla.get("tabla", []),
+            })
+
+        perfiles = db.query(PerfilUsuario).filter(
+            PerfilUsuario.id_usuario.in_(jugadores_ids)
+        ).all() if jugadores_ids else []
+        perfiles_dict = {p.id_usuario: p for p in perfiles}
+
+        for t in tablas_result:
+            for item in t["tabla"]:
+                perfil1 = perfiles_dict.get(item.get("jugador1_id"))
+                perfil2 = perfiles_dict.get(item.get("jugador2_id"))
+                nombre1 = f"{perfil1.nombre} {perfil1.apellido}" if perfil1 else f"Jugador {item.get('jugador1_id', '')}"
+                nombre2 = f"{perfil2.nombre} {perfil2.apellido}" if perfil2 else f"Jugador {item.get('jugador2_id', '')}"
+                item["jugador1_nombre"] = nombre1 if perfil1 else None
+                item["jugador2_nombre"] = nombre2 if perfil2 else None
+                item["pareja_nombre"] = f"{nombre1} / {nombre2}"
+
+        return {"zonas": zonas, "tablas": tablas_result}
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
 @router.get("/{torneo_id}/zonas/{zona_id}/tabla")
 def obtener_tabla_zona(
     torneo_id: int,
@@ -1387,7 +1446,126 @@ def obtener_tabla_zona(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+class CrearZonaRequest(BaseModel):
+    """Body para crear una zona de último momento"""
+    categoria_id: int
+    nombre: str = "Zona último momento"
+    pareja_ids: List[int]
+
+
+@router.post("/{torneo_id}/zonas")
+def crear_zona_ultimo_momento(
+    torneo_id: int,
+    body: CrearZonaRequest,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user)
+):
+    """
+    Crea una zona nueva en una categoría y asigna las parejas indicadas.
+    Para zonas de último momento (parejas que se inscriben tarde).
+    Solo organizadores. No disponible si ya se generaron playoffs.
+    """
+    from ..models.driveplus_models import Partido
+    from ..models.torneo_models import Torneo
+    from ..services.torneo_zona_service import TorneoZonaService
+
+    try:
+        # No permitir si ya hay playoffs
+        partidos_playoff = db.query(Partido).filter(
+            Partido.id_torneo == torneo_id,
+            Partido.fase.in_(['8vos', '4tos', 'semis', 'final', 'cuartos', 'semifinal'])
+        ).limit(1).first()
+        if partidos_playoff:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No se pueden agregar zonas si ya se generaron los playoffs"
+            )
+        torneo = db.query(Torneo).filter(Torneo.id == torneo_id).first()
+        if not torneo:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Torneo no encontrado")
+
+        zona = TorneoZonaService.crear_zona_ultimo_momento(
+            db, torneo_id, body.categoria_id, body.nombre, body.pareja_ids, current_user.id_usuario
+        )
+        return {
+            "message": "Zona creada. Generá los partidos de esta zona desde Programación.",
+            "zona": {"id": zona.id, "nombre": zona.nombre, "categoria_id": zona.categoria_id}
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@router.post("/{torneo_id}/zonas/{zona_id}/generar-partidos")
+def generar_partidos_zona(
+    torneo_id: int,
+    zona_id: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user)
+):
+    """
+    Genera solo los partidos (round-robin) de una zona, sin borrar partidos existentes.
+    Los partidos quedan sin fecha/cancha para asignarlos desde Programación.
+    Solo organizadores.
+    """
+    from ..models.torneo_models import TorneoZona, TorneoZonaPareja, TorneoPareja, Torneo
+    from ..models.driveplus_models import Partido
+
+    from ..services.torneo_zona_service import TorneoZonaService
+    from ..services.torneo_fixture_global_service import TorneoFixtureGlobalService
+
+    try:
+        if not TorneoZonaService._es_organizador(db, torneo_id, current_user.id_usuario):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No tienes permisos")
+        zona = db.query(TorneoZona).filter(
+            TorneoZona.id == zona_id,
+            TorneoZona.torneo_id == torneo_id
+        ).first()
+        if not zona:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Zona no encontrada")
+
+        partidos_dict = TorneoFixtureGlobalService._generar_partidos_zona(db, zona)
+        if not partidos_dict:
+            return {"message": "La zona no tiene al menos 2 parejas", "partidos_creados": 0}
+
+        torneo = db.query(Torneo).filter(Torneo.id == torneo_id).first()
+        # Batch: cargar partidos existentes de la zona (evitar N+1)
+        existentes = db.query(Partido.pareja1_id, Partido.pareja2_id).filter(
+            Partido.id_torneo == torneo_id,
+            Partido.zona_id == zona_id
+        ).all()
+        existentes_set = {(r.pareja1_id, r.pareja2_id) for r in existentes}
+        creados = 0
+        for p in partidos_dict:
+            key = (p['pareja1_id'], p['pareja2_id'])
+            if key in existentes_set:
+                continue
+            existentes_set.add(key)
+            partido = Partido(
+                id_torneo=torneo_id,
+                zona_id=zona_id,
+                categoria_id=zona.categoria_id,
+                fase='zona',
+                pareja1_id=p['pareja1_id'],
+                pareja2_id=p['pareja2_id'],
+                estado='pendiente',
+                tipo='torneo',
+                id_creador=torneo.creado_por if torneo else current_user.id_usuario,
+            )
+            db.add(partido)
+            creados += 1
+        db.commit()
+        return {"message": f"Partidos de la zona creados ({creados})", "partidos_creados": creados}
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
@@ -2177,27 +2355,32 @@ def crear_slots(
         if not canchas:
             raise HTTPException(status_code=400, detail="No hay canchas disponibles")
         
-        # Crear slots
+        # Cargar slots existentes del día (evitar N+1)
+        cancha_ids = [c.id for c in canchas]
+        hora_inicio_dia = hora_actual
+        existentes = db.query(TorneoSlot.cancha_id, TorneoSlot.fecha_hora_inicio).filter(
+            TorneoSlot.torneo_id == torneo_id,
+            TorneoSlot.cancha_id.in_(cancha_ids),
+            TorneoSlot.fecha_hora_inicio >= hora_inicio_dia,
+            TorneoSlot.fecha_hora_inicio <= hora_limite
+        ).all()
+        slots_existentes = {(r.cancha_id, r.fecha_hora_inicio) for r in existentes}
+        
         slots_creados = 0
         while hora_actual + timedelta(minutes=duracion_minutos) <= hora_limite:
             for cancha in canchas:
-                # Verificar si ya existe el slot
-                existe = db.query(TorneoSlot).filter(
-                    TorneoSlot.torneo_id == torneo_id,
-                    TorneoSlot.cancha_id == cancha.id,
-                    TorneoSlot.fecha_hora_inicio == hora_actual
-                ).first()
-                
-                if not existe:
-                    slot = TorneoSlot(
-                        torneo_id=torneo_id,
-                        cancha_id=cancha.id,
-                        fecha_hora_inicio=hora_actual,
-                        fecha_hora_fin=hora_actual + timedelta(minutes=duracion_minutos),
-                        ocupado=False
-                    )
-                    db.add(slot)
-                    slots_creados += 1
+                if (cancha.id, hora_actual) in slots_existentes:
+                    continue
+                slots_existentes.add((cancha.id, hora_actual))
+                slot = TorneoSlot(
+                    torneo_id=torneo_id,
+                    cancha_id=cancha.id,
+                    fecha_hora_inicio=hora_actual,
+                    fecha_hora_fin=hora_actual + timedelta(minutes=duracion_minutos),
+                    ocupado=False
+                )
+                db.add(slot)
+                slots_creados += 1
             
             hora_actual += timedelta(minutes=duracion_minutos)
         

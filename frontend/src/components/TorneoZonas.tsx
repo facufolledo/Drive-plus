@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Trophy, Users, Target, AlertCircle, X, RefreshCw, Calendar, Filter, Clock } from 'lucide-react';
+import { Trophy, Users, Target, AlertCircle, X, RefreshCw, Calendar, Filter, Clock, PlusCircle, ArrowRightLeft } from 'lucide-react';
 import { torneoService, Categoria } from '../services/torneo.service';
 import Card from './Card';
 import Button from './Button';
 import SkeletonLoader from './SkeletonLoader';
 import { PlayerLink } from './UserLink';
 import ModalHorariosPareja from './ModalHorariosPareja';
+import ModalAgregarZonaUltimoMomento from './ModalAgregarZonaUltimoMomento';
+import ModalMoverParejaZona from './ModalMoverParejaZona';
 
 interface TorneoZonasProps {
   torneoId: number;
@@ -34,6 +36,14 @@ export default function TorneoZonas({ torneoId, esOrganizador }: TorneoZonasProp
   const [categoriaFiltro, setCategoriaFiltro] = useState<number | null>(null);
   const [parejaHorarios, setParejaHorarios] = useState<any>(null);
   const [modalHorariosOpen, setModalHorariosOpen] = useState(false);
+  const [modalZonaUltimoMomentoOpen, setModalZonaUltimoMomentoOpen] = useState(false);
+  const [parejaParaMover, setParejaParaMover] = useState<{
+    pareja_id: number;
+    pareja_nombre: string;
+    zona_origen_id: number;
+    zona_origen_nombre: string;
+    categoria_id?: number;
+  } | null>(null);
 
   useEffect(() => {
     // Guard: Solo cargar si torneoId es válido
@@ -77,20 +87,10 @@ export default function TorneoZonas({ torneoId, esOrganizador }: TorneoZonasProp
 
     try {
       setLoading(true);
-      const zonasData = await torneoService.listarZonas(torneoId);
+      const { zonas: zonasData, tablas: tablasData } = await torneoService.listarZonasConTablas(torneoId);
       setZonas(zonasData);
+      setTablas(tablasData);
 
-      // Cargar tablas de posiciones de todas las zonas
-      let tablasData: TablaZona[] = [];
-      if (zonasData.length > 0) {
-        const tablasPromises = zonasData.map((zona: any) =>
-          torneoService.obtenerTablaPosiciones(torneoId, zona.id)
-        );
-        tablasData = await Promise.all(tablasPromises);
-        setTablas(tablasData);
-      }
-
-      // Guardar en cache
       zonasCache[torneoId] = {
         zonas: zonasData,
         tablas: tablasData,
@@ -254,9 +254,23 @@ export default function TorneoZonas({ torneoId, esOrganizador }: TorneoZonasProp
 
   // Función para abrir modal de horarios
   const verHorariosPareja = (pareja: any) => {
-    // Pasar el objeto completo de la pareja al modal
     setParejaHorarios(pareja);
     setModalHorariosOpen(true);
+  };
+
+  const abrirMoverPareja = (item: any, zonaId: number, zonaNombre: string, categoriaId?: number) => {
+    setParejaParaMover({
+      pareja_id: item.pareja_id,
+      pareja_nombre: item.pareja_nombre || `Pareja #${item.pareja_id}`,
+      zona_origen_id: zonaId,
+      zona_origen_nombre: zonaNombre,
+      categoria_id: categoriaId,
+    });
+  };
+
+  const handleMoverPareja = async (parejaId: number, zonaDestinoId: number) => {
+    await torneoService.moverParejaEntreZonas(torneoId, parejaId, zonaDestinoId);
+    refrescarDatos();
   };
 
   // Filtrar tablas por categoría (SIEMPRE filtrar, nunca mostrar todas)
@@ -282,6 +296,18 @@ export default function TorneoZonas({ torneoId, esOrganizador }: TorneoZonasProp
             >
               <Calendar size={14} />
               Cargar Resultados
+            </Button>
+          )}
+          {/* Agregar zona de último momento (solo organizador, antes de playoffs) */}
+          {esOrganizador && zonas.length > 0 && (
+            <Button
+              onClick={() => setModalZonaUltimoMomentoOpen(true)}
+              variant="ghost"
+              size="sm"
+              className="flex items-center gap-2 text-xs border border-primary/30 text-primary hover:bg-primary/10"
+            >
+              <PlusCircle size={14} />
+              Agregar zona último momento
             </Button>
           )}
           
@@ -502,7 +528,7 @@ export default function TorneoZonas({ torneoId, esOrganizador }: TorneoZonasProp
                         Pts
                       </th>
                       <th className="text-center py-2 md:py-3 px-2 text-textSecondary text-[10px] md:text-xs font-bold uppercase">
-                        
+                        {esOrganizador ? 'Acciones' : ''}
                       </th>
                     </tr>
                   </thead>
@@ -619,13 +645,24 @@ export default function TorneoZonas({ torneoId, esOrganizador }: TorneoZonasProp
                           </span>
                         </td>
                         <td className="py-2 md:py-3 px-2 text-center">
-                          <button
-                            onClick={() => verHorariosPareja(item)}
-                            className="p-1.5 hover:bg-primary/10 rounded-lg transition-colors text-primary hover:text-accent"
-                            title="Ver horarios disponibles"
-                          >
-                            <Clock size={16} />
-                          </button>
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              onClick={() => verHorariosPareja(item)}
+                              className="p-1.5 hover:bg-primary/10 rounded-lg transition-colors text-primary hover:text-accent"
+                              title="Ver horarios disponibles"
+                            >
+                              <Clock size={16} />
+                            </button>
+                            {esOrganizador && !item.eliminada && (
+                              <button
+                                onClick={() => abrirMoverPareja(item, tabla.zona_id, tabla.zona_nombre, tabla.categoria_id)}
+                                className="p-1.5 hover:bg-primary/10 rounded-lg transition-colors text-primary hover:text-accent"
+                                title="Mover a otra zona"
+                              >
+                                <ArrowRightLeft size={16} />
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -677,6 +714,37 @@ export default function TorneoZonas({ torneoId, esOrganizador }: TorneoZonasProp
             setParejaHorarios(null);
           }}
           pareja={parejaHorarios}
+        />
+      )}
+
+      {/* Modal Agregar zona de último momento */}
+      <ModalAgregarZonaUltimoMomento
+        isOpen={modalZonaUltimoMomentoOpen}
+        onClose={() => setModalZonaUltimoMomentoOpen(false)}
+        torneoId={torneoId}
+        categorias={categorias.map((c) => ({ id: c.id, nombre: c.nombre }))}
+        zonas={zonas.map((z: any) => ({
+          id: z.id,
+          nombre: z.nombre,
+          categoria_id: z.categoria_id,
+          parejas: z.parejas || [],
+        }))}
+        onZonaCreada={refrescarDatos}
+      />
+
+      {/* Modal Mover pareja a otra zona */}
+      {parejaParaMover && (
+        <ModalMoverParejaZona
+          isOpen={!!parejaParaMover}
+          onClose={() => setParejaParaMover(null)}
+          parejaNombre={parejaParaMover.pareja_nombre}
+          parejaId={parejaParaMover.pareja_id}
+          zonaOrigenId={parejaParaMover.zona_origen_id}
+          zonaOrigenNombre={parejaParaMover.zona_origen_nombre}
+          zonasDestino={tablasFiltradas
+            .filter((t) => t.zona_id !== parejaParaMover.zona_origen_id && t.categoria_id === parejaParaMover.categoria_id)
+            .map((t) => ({ zona_id: t.zona_id, zona_nombre: t.zona_nombre, categoria_id: t.categoria_id }))}
+          onMover={handleMoverPareja}
         />
       )}
     </div>
