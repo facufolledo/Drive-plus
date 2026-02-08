@@ -465,6 +465,46 @@ class TorneoPlayoffService:
                 partidos_por_fase[fase].append(partido)
         
         return partidos_por_fase
+
+    @staticmethod
+    def eliminar_playoffs(
+        db: Session,
+        torneo_id: int,
+        user_id: int,
+        categoria_id: Optional[int] = None
+    ) -> int:
+        """
+        Elimina todos los partidos de playoffs del torneo (o solo de una categoría).
+        Solo organizadores. Si se eliminan todos los playoffs, el torneo vuelve a fase_grupos.
+        Devuelve la cantidad de partidos eliminados.
+        """
+        if not TorneoPlayoffService._es_organizador(db, torneo_id, user_id):
+            raise ValueError("No tienes permisos para eliminar playoffs")
+
+        query_delete = db.query(Partido).filter(
+            Partido.id_torneo == torneo_id,
+            Partido.fase.in_(['16avos', '8vos', '4tos', 'cuartos', 'semis', 'semifinal', 'final'])
+        )
+        if categoria_id is not None:
+            query_delete = query_delete.filter(Partido.categoria_id == categoria_id)
+        else:
+            query_delete = query_delete.filter(Partido.categoria_id.is_(None))
+
+        count = query_delete.delete(synchronize_session=False)
+        db.commit()
+
+        # Si no quedan partidos de playoffs en el torneo, volver estado a fase_grupos
+        restantes = db.query(Partido).filter(
+            Partido.id_torneo == torneo_id,
+            Partido.fase.in_(['16avos', '8vos', '4tos', 'cuartos', 'semis', 'semifinal', 'final'])
+        ).count()
+        if restantes == 0:
+            torneo = db.query(Torneo).filter(Torneo.id == torneo_id).first()
+            if torneo:
+                torneo.estado = EstadoTorneo.FASE_GRUPOS
+                db.commit()
+
+        return count
     
     @staticmethod
     def avanzar_ganador(

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Trophy, Zap, Users, Info, RefreshCw, Filter } from 'lucide-react';
+import { Trophy, Zap, Users, Info, RefreshCw, Filter, Trash2 } from 'lucide-react';
 import Card from './Card';
 import Button from './Button';
 import SkeletonLoader from './SkeletonLoader';
@@ -32,6 +32,7 @@ export default function TorneoPlayoffs({ torneoId, esOrganizador }: TorneoPlayof
   const [partidos, setPartidos] = useState<Partido[]>([]);
   const [loading, setLoading] = useState(true);
   const [generando, setGenerando] = useState(false);
+  const [eliminando, setEliminando] = useState(false);
   const [playoffsGenerados, setPlayoffsGenerados] = useState(false);
   const [ultimaActualizacion, setUltimaActualizacion] = useState<Date | null>(null);
   const { parejas } = useTorneos();
@@ -144,6 +145,26 @@ export default function TorneoPlayoffs({ torneoId, esOrganizador }: TorneoPlayof
     }
     delete playoffsCache[torneoId];
     await generarPlayoffs(categoriaFiltro ?? undefined);
+  };
+
+  const eliminarPlayoffs = async () => {
+    const porCategoria = categoriaFiltro != null;
+    if (!confirm(porCategoria
+      ? '¿Eliminar playoffs de esta categoría? Podrás generarlos de nuevo después.'
+      : '¿Eliminar todos los playoffs del torneo? Podrás generarlos de nuevo después.')) {
+      return;
+    }
+    try {
+      setEliminando(true);
+      setError(null);
+      await torneoService.eliminarPlayoffs(torneoId, categoriaFiltro ?? undefined);
+      delete playoffsCache[torneoId];
+      await cargarPlayoffs(true);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Error al eliminar playoffs');
+    } finally {
+      setEliminando(false);
+    }
   };
 
   // Invalidar cache cuando se carga un resultado
@@ -333,16 +354,28 @@ export default function TorneoPlayoffs({ torneoId, esOrganizador }: TorneoPlayof
             </button>
           </div>
           {esOrganizador && (
-            <Button
-              onClick={regenerarPlayoffs}
-              disabled={generando}
-              variant="ghost"
-              size="sm"
-              className="text-xs"
-            >
-              <Zap size={14} className="mr-1" />
-              {generando ? 'Regenerando...' : 'Regenerar Playoffs'}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={eliminarPlayoffs}
+                disabled={eliminando}
+                variant="ghost"
+                size="sm"
+                className="text-xs text-red-500 hover:text-red-400 hover:bg-red-500/10"
+              >
+                <Trash2 size={14} className="mr-1" />
+                {eliminando ? 'Eliminando...' : 'Eliminar playoffs'}
+              </Button>
+              <Button
+                onClick={regenerarPlayoffs}
+                disabled={generando}
+                variant="ghost"
+                size="sm"
+                className="text-xs"
+              >
+                <Zap size={14} className="mr-1" />
+                {generando ? 'Regenerando...' : 'Regenerar Playoffs'}
+              </Button>
+            </div>
           )}
         </div>
         

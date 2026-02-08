@@ -506,6 +506,16 @@ class TorneoService {
     return response.data;
   }
 
+  async eliminarPlayoffs(torneoId: number, categoriaId?: number): Promise<{ message: string; eliminados: number }> {
+    const config: any = this.getAuthHeaders();
+    if (categoriaId != null) config.params = { categoria_id: categoriaId };
+    const response = await axios.delete(
+      `${API_URL}/torneos/${torneoId}/playoffs`,
+      config
+    );
+    return response.data;
+  }
+
   async intercambiarParejasPlayoff(
     torneoId: number,
     data: { partido_id_a: number; partido_id_b: number; slot_a: 1 | 2; slot_b: 1 | 2 }

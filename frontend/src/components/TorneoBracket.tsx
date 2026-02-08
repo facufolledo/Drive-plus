@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
-import { Trophy, Edit3, Crown, Star, Sparkles, FastForward, ArrowRightLeft } from 'lucide-react';
+import { Trophy, Edit3, Crown, Star, Sparkles, FastForward, ArrowRightLeft, X } from 'lucide-react';
 import ModalCargarResultado from './ModalCargarResultado';
-import ModalIntercambiarParejasPlayoff from './ModalIntercambiarParejasPlayoff';
+import torneoService from '../services/torneo.service';
 
 interface Partido {
   id: number;
@@ -29,7 +29,8 @@ interface TorneoBracketProps {
 export default function TorneoBracket({ partidos, torneoId, esOrganizador, onResultadoCargado }: TorneoBracketProps) {
   const [partidoSeleccionado, setPartidoSeleccionado] = useState<Partido | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
-  const [partidoParaIntercambiar, setPartidoParaIntercambiar] = useState<Partido | null>(null);
+  const [modoIntercambiar, setModoIntercambiar] = useState<{ partidoId: number; slot: 1 | 2 } | null>(null);
+  const [intercambiando, setIntercambiando] = useState(false);
   const [svgSize, setSvgSize] = useState({ width: 0, height: 0 });
   const [lines, setLines] = useState<JSX.Element[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -203,7 +204,24 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
     onResultadoCargado?.();
   };
 
-  const partidosPendientes = partidos.filter((p) => p.estado === 'pendiente' && p.id > 0);
+  const partidoOrigen = modoIntercambiar ? partidos.find((p) => p.id === modoIntercambiar.partidoId) : null;
+
+  const ejecutarIntercambio = async (partidoIdB: number, slotB: 1 | 2) => {
+    if (!modoIntercambiar || !partidoOrigen) return;
+    setIntercambiando(true);
+    try {
+      await torneoService.intercambiarParejasPlayoff(torneoId, {
+        partido_id_a: partidoOrigen.id,
+        partido_id_b: partidoIdB,
+        slot_a: modoIntercambiar.slot,
+        slot_b: slotB,
+      });
+      setModoIntercambiar(null);
+      onResultadoCargado?.();
+    } finally {
+      setIntercambiando(false);
+    }
+  };
 
   // PartidoBox component
   const PartidoBox = ({ partido, esFinal = false }: { partido: Partido; esFinal?: boolean }) => {
@@ -214,6 +232,13 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
     const puedeCargarResultado =
       esOrganizador && partido.estado === 'pendiente' && partido.id > 0 && tieneAmbosEquipos;
     const partidoFinalizado = partido.estado === 'confirmado';
+    const esOrigenIntercambiar = modoIntercambiar?.partidoId === partido.id;
+    const esDestinoIntercambiar =
+      esOrganizador &&
+      partido.estado === 'pendiente' &&
+      partido.id > 0 &&
+      modoIntercambiar &&
+      partido.id !== modoIntercambiar.partidoId;
 
     if (esBye) {
       const nombreGanador = partido.pareja1_nombre || partido.pareja2_nombre || 'TBD';
@@ -237,44 +262,98 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
     return (
       <div
         className={`bg-card border-2 rounded-lg overflow-hidden w-[200px] ${
-          esFinal
-            ? 'border-accent shadow-lg shadow-accent/20'
-            : partidoFinalizado
-              ? 'border-green-500/50'
-              : puedeCargarResultado
-                ? 'border-yellow-500/50'
-                : 'border-primary/30'
+          esOrigenIntercambiar
+            ? 'border-primary ring-2 ring-primary/50 shadow-lg'
+            : esFinal
+              ? 'border-accent shadow-lg shadow-accent/20'
+              : partidoFinalizado
+                ? 'border-green-500/50'
+                : puedeCargarResultado
+                  ? 'border-yellow-500/50'
+                  : 'border-primary/30'
         }`}
       >
+        {/* Fila pareja 1 */}
         <div
-          className={`flex items-center gap-2 px-3 py-2.5 border-b border-cardBorder ${ganadorA ? 'bg-green-500/20' : 'bg-card'}`}
+          className={`flex items-center gap-1 px-3 py-2.5 border-b border-cardBorder ${ganadorA ? 'bg-green-500/20' : 'bg-card'}`}
         >
           {ganadorA && <Trophy size={12} className="text-green-500 flex-shrink-0" />}
           <span
-            className={`text-xs font-bold truncate ${ganadorA ? 'text-green-500' : partido.pareja1_nombre ? 'text-textPrimary' : 'text-textSecondary'}`}
+            className={`flex-1 text-xs font-bold truncate ${ganadorA ? 'text-green-500' : partido.pareja1_nombre ? 'text-textPrimary' : 'text-textSecondary'}`}
           >
             {partido.pareja1_nombre || 'TBD'}
           </span>
+          {esDestinoIntercambiar && (
+            <button
+              type="button"
+              onClick={() => ejecutarIntercambio(partido.id, 1)}
+              disabled={intercambiando}
+              className="p-1 rounded bg-primary/20 hover:bg-primary/40 text-primary disabled:opacity-50"
+              title="Intercambiar con esta pareja"
+            >
+              <ArrowRightLeft size={12} />
+            </button>
+          )}
         </div>
-        <div className={`flex items-center gap-2 px-3 py-2.5 ${ganadorB ? 'bg-green-500/20' : 'bg-card'}`}>
+        {/* Fila pareja 2 */}
+        <div className={`flex items-center gap-1 px-3 py-2.5 ${ganadorB ? 'bg-green-500/20' : 'bg-card'}`}>
           {ganadorB && <Trophy size={12} className="text-green-500 flex-shrink-0" />}
           <span
-            className={`text-xs font-bold truncate ${ganadorB ? 'text-green-500' : partido.pareja2_nombre ? 'text-textPrimary' : 'text-textSecondary'}`}
+            className={`flex-1 text-xs font-bold truncate ${ganadorB ? 'text-green-500' : partido.pareja2_nombre ? 'text-textPrimary' : 'text-textSecondary'}`}
           >
             {partido.pareja2_nombre || 'TBD'}
           </span>
+          {esDestinoIntercambiar && (
+            <button
+              type="button"
+              onClick={() => ejecutarIntercambio(partido.id, 2)}
+              disabled={intercambiando}
+              className="p-1 rounded bg-primary/20 hover:bg-primary/40 text-primary disabled:opacity-50"
+              title="Intercambiar con esta pareja"
+            >
+              <ArrowRightLeft size={12} />
+            </button>
+          )}
         </div>
-        {esOrganizador && partido.estado === 'pendiente' && partido.id > 0 && (partido.pareja1_id || partido.pareja2_id) && (
+        {esOrigenIntercambiar && (
+          <div className="flex items-center gap-1 p-1.5 border-t border-primary/30 bg-primary/10">
+            <span className="text-[10px] text-textSecondary flex-1">Intercambiar:</span>
+            <button
+              type="button"
+              onClick={() => setModoIntercambiar((m) => (m ? { ...m, slot: 1 } : null))}
+              className={`px-2 py-0.5 rounded text-[10px] font-bold ${modoIntercambiar?.slot === 1 ? 'bg-primary text-white' : 'bg-background text-textSecondary'}`}
+            >
+              1
+            </button>
+            <button
+              type="button"
+              onClick={() => setModoIntercambiar((m) => (m ? { ...m, slot: 2 } : null))}
+              className={`px-2 py-0.5 rounded text-[10px] font-bold ${modoIntercambiar?.slot === 2 ? 'bg-primary text-white' : 'bg-background text-textSecondary'}`}
+            >
+              2
+            </button>
+            <button
+              type="button"
+              onClick={() => setModoIntercambiar(null)}
+              className="p-0.5 rounded hover:bg-background text-textSecondary"
+              title="Cancelar"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
+        {!esOrigenIntercambiar && esOrganizador && partido.estado === 'pendiente' && partido.id > 0 && (partido.pareja1_id || partido.pareja2_id) && (
           <button
-            onClick={() => setPartidoParaIntercambiar(partido)}
+            type="button"
+            onClick={() => setModoIntercambiar({ partidoId: partido.id, slot: 1 })}
             className="w-full py-1.5 bg-primary/10 hover:bg-primary/20 transition-all flex items-center justify-center gap-1 border-t border-cardBorder text-primary"
-            title="Intercambiar parejas con otro cruce"
+            title="Intercambiar parejas: elegí luego otro cruce"
           >
             <ArrowRightLeft size={10} />
             <span className="text-[10px] font-bold">Intercambiar</span>
           </button>
         )}
-        {puedeCargarResultado ? (
+        {!esOrigenIntercambiar && puedeCargarResultado ? (
           <button
             onClick={() => abrirModalResultado(partido)}
             className="w-full py-1.5 bg-gradient-to-r from-accent/30 to-yellow-500/30 hover:from-accent/50 hover:to-yellow-500/50 transition-all flex items-center justify-center gap-1 border-t border-accent/20"
@@ -460,20 +539,6 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
           document.body
         )}
 
-      {/* Modal intercambiar parejas */}
-      {partidoParaIntercambiar && (
-        <ModalIntercambiarParejasPlayoff
-          isOpen={!!partidoParaIntercambiar}
-          onClose={() => setPartidoParaIntercambiar(null)}
-          torneoId={torneoId}
-          partidoOrigen={partidoParaIntercambiar}
-          partidosDestino={partidosPendientes}
-          onIntercambiado={() => {
-            setPartidoParaIntercambiar(null);
-            onResultadoCargado?.();
-          }}
-        />
-      )}
-    </div>
+      </div>
   );
 }

@@ -2034,6 +2034,30 @@ class IntercambiarParejasPlayoffRequest(BaseModel):
     slot_b: int  # 1 = pareja1, 2 = pareja2
 
 
+@router.delete("/{torneo_id}/playoffs")
+def eliminar_playoffs(
+    torneo_id: int,
+    categoria_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user)
+):
+    """
+    Elimina los partidos de playoffs del torneo (o solo de una categoría).
+    Solo organizadores. Permite volver a generar playoffs después.
+    """
+    from ..services.torneo_playoff_service import TorneoPlayoffService
+
+    try:
+        count = TorneoPlayoffService.eliminar_playoffs(
+            db, torneo_id, current_user.id_usuario, categoria_id
+        )
+        return {"message": "Playoffs eliminados", "eliminados": count}
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
 @router.post("/{torneo_id}/playoffs/intercambiar-parejas")
 def intercambiar_parejas_playoff(
     torneo_id: int,
