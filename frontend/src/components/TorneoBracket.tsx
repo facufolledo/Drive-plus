@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
-import { Trophy, Edit3, Crown, Star, Sparkles, FastForward } from 'lucide-react';
+import { Trophy, Edit3, Crown, Star, Sparkles, FastForward, ArrowRightLeft } from 'lucide-react';
 import ModalCargarResultado from './ModalCargarResultado';
+import ModalIntercambiarParejasPlayoff from './ModalIntercambiarParejasPlayoff';
 
 interface Partido {
   id: number;
@@ -28,6 +29,7 @@ interface TorneoBracketProps {
 export default function TorneoBracket({ partidos, torneoId, esOrganizador, onResultadoCargado }: TorneoBracketProps) {
   const [partidoSeleccionado, setPartidoSeleccionado] = useState<Partido | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [partidoParaIntercambiar, setPartidoParaIntercambiar] = useState<Partido | null>(null);
   const [svgSize, setSvgSize] = useState({ width: 0, height: 0 });
   const [lines, setLines] = useState<JSX.Element[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -201,6 +203,8 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
     onResultadoCargado?.();
   };
 
+  const partidosPendientes = partidos.filter((p) => p.estado === 'pendiente' && p.id > 0);
+
   // PartidoBox component
   const PartidoBox = ({ partido, esFinal = false }: { partido: Partido; esFinal?: boolean }) => {
     const esBye = partido.estado === 'bye';
@@ -260,6 +264,16 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
             {partido.pareja2_nombre || 'TBD'}
           </span>
         </div>
+        {esOrganizador && partido.estado === 'pendiente' && partido.id > 0 && (partido.pareja1_id || partido.pareja2_id) && (
+          <button
+            onClick={() => setPartidoParaIntercambiar(partido)}
+            className="w-full py-1.5 bg-primary/10 hover:bg-primary/20 transition-all flex items-center justify-center gap-1 border-t border-cardBorder text-primary"
+            title="Intercambiar parejas con otro cruce"
+          >
+            <ArrowRightLeft size={10} />
+            <span className="text-[10px] font-bold">Intercambiar</span>
+          </button>
+        )}
         {puedeCargarResultado ? (
           <button
             onClick={() => abrirModalResultado(partido)}
@@ -430,7 +444,7 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
         </div>
       </div>
 
-      {/* Modal */}
+      {/* Modal resultado */}
       {partidoSeleccionado &&
         createPortal(
           <ModalCargarResultado
@@ -445,6 +459,21 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
           />,
           document.body
         )}
+
+      {/* Modal intercambiar parejas */}
+      {partidoParaIntercambiar && (
+        <ModalIntercambiarParejasPlayoff
+          isOpen={!!partidoParaIntercambiar}
+          onClose={() => setPartidoParaIntercambiar(null)}
+          torneoId={torneoId}
+          partidoOrigen={partidoParaIntercambiar}
+          partidosDestino={partidosPendientes}
+          onIntercambiado={() => {
+            setPartidoParaIntercambiar(null);
+            onResultadoCargado?.();
+          }}
+        />
+      )}
     </div>
   );
 }

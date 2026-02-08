@@ -22,9 +22,11 @@ interface TablaZona {
   tabla: any[];
 }
 
-// Cache simple para evitar recargas innecesarias
-const zonasCache: Record<number, { zonas: any[]; tablas: TablaZona[]; timestamp: number }> = {};
-const CACHE_TTL = 60000; // 1 minuto
+// Cache por torneo+categoría
+const zonasCache: Record<string, { zonas: any[]; tablas: TablaZona[]; timestamp: number }> = {};
+const CACHE_TTL = 60000;
+const cacheKey = (torneoId: number, categoriaId: number | null) =>
+  `${torneoId}_${categoriaId ?? 'all'}`;
 
 export default function TorneoZonas({ torneoId, esOrganizador }: TorneoZonasProps) {
   const [zonas, setZonas] = useState<any[]>([]);
@@ -46,21 +48,26 @@ export default function TorneoZonas({ torneoId, esOrganizador }: TorneoZonasProp
   } | null>(null);
 
   useEffect(() => {
-    // Guard: Solo cargar si torneoId es válido
     if (!torneoId || isNaN(torneoId) || torneoId <= 0) {
       setLoading(false);
       return;
     }
-    cargarDatos();
     cargarCategorias();
   }, [torneoId]);
 
-  // Seleccionar automáticamente la primera categoría cuando se cargan
   useEffect(() => {
     if (categorias.length > 0 && categoriaFiltro === null) {
       setCategoriaFiltro(categorias[0].id);
     }
   }, [categorias]);
+
+  // Cargar zonas+tablas solo para la categoría seleccionada (más rápido)
+  useEffect(() => {
+    if (!torneoId || isNaN(torneoId) || torneoId <= 0) return;
+    // Si hay categorías, esperar a que se seleccione una; si no hay, cargar todo
+    if (categorias.length > 0 && categoriaFiltro === null) return;
+    cargarDatos(false);
+  }, [torneoId, categoriaFiltro, categorias.length]);
 
   const cargarCategorias = async () => {
     if (!torneoId || isNaN(torneoId) || torneoId <= 0) return;
@@ -75,27 +82,23 @@ export default function TorneoZonas({ torneoId, esOrganizador }: TorneoZonasProp
 
   const cargarDatos = async (forzar: boolean = false) => {
     if (!torneoId || isNaN(torneoId) || torneoId <= 0) return;
-    
-    // Verificar cache
-    const cached = zonasCache[torneoId];
+    const key = cacheKey(torneoId, categoriaFiltro);
+    const cached = zonasCache[key];
     if (!forzar && cached && Date.now() - cached.timestamp < CACHE_TTL) {
       setZonas(cached.zonas);
       setTablas(cached.tablas);
       setLoading(false);
       return;
     }
-
     try {
       setLoading(true);
-      const { zonas: zonasData, tablas: tablasData } = await torneoService.listarZonasConTablas(torneoId);
+      const { zonas: zonasData, tablas: tablasData } = await torneoService.listarZonasConTablas(
+        torneoId,
+        categoriaFiltro ?? undefined
+      );
       setZonas(zonasData);
       setTablas(tablasData);
-
-      zonasCache[torneoId] = {
-        zonas: zonasData,
-        tablas: tablasData,
-        timestamp: Date.now()
-      };
+      zonasCache[key] = { zonas: zonasData, tablas: tablasData, timestamp: Date.now() };
     } catch (error) {
       console.error('Error al cargar datos:', error);
     } finally {
@@ -105,7 +108,7 @@ export default function TorneoZonas({ torneoId, esOrganizador }: TorneoZonasProp
 
   // Función para invalidar cache y recargar
   const refrescarDatos = () => {
-    delete zonasCache[torneoId];
+    delete zonasCache[cacheKey(torneoId, categoriaFiltro)];
     cargarDatos(true);
   };
 

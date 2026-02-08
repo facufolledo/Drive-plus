@@ -30,9 +30,10 @@ class TorneoPlayoffService:
         db: Session,
         torneo_id: int,
         user_id: int,
-        clasificados_por_zona: int = 2
+        clasificados_por_zona: int = 2,
+        categoria_id: Optional[int] = None
     ) -> List[Partido]:
-        """Genera playoffs para TODAS las categorías del torneo"""
+        """Genera playoffs. Si categoria_id se pasa, solo para esa categoría; si no, para todas."""
         torneo = db.query(Torneo).filter(Torneo.id == torneo_id).first()
         if not torneo:
             raise ValueError("Torneo no encontrado")
@@ -40,26 +41,31 @@ class TorneoPlayoffService:
         if not TorneoPlayoffService._es_organizador(db, torneo_id, user_id):
             raise ValueError("No tienes permisos para generar playoffs")
         
-        # Obtener categorías del torneo
-        categorias = db.query(TorneoCategoria).filter(
-            TorneoCategoria.torneo_id == torneo_id
-        ).all()
-        
         todos_partidos = []
         
-        if categorias:
-            for categoria in categorias:
-                partidos = TorneoPlayoffService._generar_playoffs_categoria(
-                    db, torneo_id, user_id, categoria.id, clasificados_por_zona
-                )
-                todos_partidos.extend(partidos)
-        else:
+        if categoria_id is not None:
             partidos = TorneoPlayoffService._generar_playoffs_categoria(
-                db, torneo_id, user_id, None, clasificados_por_zona
+                db, torneo_id, user_id, categoria_id, clasificados_por_zona
             )
             todos_partidos.extend(partidos)
+        else:
+            categorias = db.query(TorneoCategoria).filter(
+                TorneoCategoria.torneo_id == torneo_id
+            ).all()
+            if categorias:
+                for categoria in categorias:
+                    partidos = TorneoPlayoffService._generar_playoffs_categoria(
+                        db, torneo_id, user_id, categoria.id, clasificados_por_zona
+                    )
+                    todos_partidos.extend(partidos)
+            else:
+                partidos = TorneoPlayoffService._generar_playoffs_categoria(
+                    db, torneo_id, user_id, None, clasificados_por_zona
+                )
+                todos_partidos.extend(partidos)
         
-        torneo.estado = EstadoTorneo.FASE_ELIMINACION
+        if todos_partidos:
+            torneo.estado = EstadoTorneo.FASE_ELIMINACION
         db.commit()
         
         return todos_partidos

@@ -39,16 +39,20 @@ export default function TorneoPlayoffs({ torneoId, esOrganizador }: TorneoPlayof
   const [categoriaFiltro, setCategoriaFiltro] = useState<number | null>(null);
 
   useEffect(() => {
-    // Guard: Solo cargar si torneoId es válido
     if (!torneoId || isNaN(torneoId) || torneoId <= 0) {
       setLoading(false);
       return;
     }
-    
     torneoService.listarCategorias(torneoId)
       .then(setCategorias)
       .catch(() => setCategorias([]));
   }, [torneoId]);
+
+  useEffect(() => {
+    if (categorias.length > 0 && categoriaFiltro === null) {
+      setCategoriaFiltro(categorias[0].id);
+    }
+  }, [categorias]);
 
   const cargarPlayoffs = useCallback(async (forzar: boolean = false) => {
     if (!torneoId || isNaN(torneoId) || torneoId <= 0) return;
@@ -120,12 +124,12 @@ export default function TorneoPlayoffs({ torneoId, esOrganizador }: TorneoPlayof
 
   const [error, setError] = useState<string | null>(null);
 
-  const generarPlayoffs = async () => {
+  const generarPlayoffs = async (catId?: number) => {
     try {
       setGenerando(true);
       setError(null);
-      await torneoService.generarPlayoffs(torneoId);
-      await cargarPlayoffs();
+      await torneoService.generarPlayoffs(torneoId, 2, catId ?? categoriaFiltro ?? undefined);
+      await cargarPlayoffs(true);
     } catch (error: any) {
       console.error('Error al generar playoffs:', error);
       setError(error.response?.data?.detail || 'Error al generar playoffs');
@@ -139,7 +143,7 @@ export default function TorneoPlayoffs({ torneoId, esOrganizador }: TorneoPlayof
       return;
     }
     delete playoffsCache[torneoId];
-    await generarPlayoffs();
+    await generarPlayoffs(categoriaFiltro ?? undefined);
   };
 
   // Invalidar cache cuando se carga un resultado
@@ -185,7 +189,29 @@ export default function TorneoPlayoffs({ torneoId, esOrganizador }: TorneoPlayof
             Fase de Playoffs
           </h3>
           
-          {parejasInscritas === 0 ? (
+          {/* Filtro categoría en estado vacío */}
+              {categorias.length > 0 && (
+                <div className="flex flex-wrap gap-2 justify-center mb-4">
+                  {categorias.map((cat) => {
+                    const esF = cat.genero === 'femenino';
+                    const esMixto = cat.genero === 'mixto';
+                    const colorClasses = categoriaFiltro === cat.id
+                      ? esMixto ? 'from-purple-500 to-purple-600' : esF ? 'from-pink-500 to-pink-600' : 'from-blue-500 to-blue-600'
+                      : 'bg-cardBorder text-textSecondary';
+                    return (
+                      <button
+                        key={cat.id}
+                        onClick={() => setCategoriaFiltro(cat.id)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${categoriaFiltro === cat.id ? `bg-gradient-to-r ${colorClasses} text-white` : colorClasses}`}
+                      >
+                        {esMixto ? '⚥' : esF ? '♀' : '♂'} {cat.nombre}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {parejasInscritas === 0 ? (
             <>
               <p className="text-textSecondary mb-4 text-sm md:text-base">
                 Aún no hay parejas inscritas en el torneo.
@@ -228,15 +254,22 @@ export default function TorneoPlayoffs({ torneoId, esOrganizador }: TorneoPlayof
               )}
 
               {esOrganizador && (
-                <Button
-                  onClick={generarPlayoffs}
-                  disabled={generando || parejasActivas < 2}
-                  variant="accent"
-                  className="gap-2"
-                >
-                  <Zap size={18} />
-                  {generando ? 'Generando...' : 'Generar Playoffs'}
-                </Button>
+                <div className="flex flex-col items-center gap-2">
+                  {categorias.length > 1 ? (
+                    <p className="text-xs text-textSecondary">Generar para categoría seleccionada:</p>
+                  ) : null}
+                  <Button
+                    onClick={() => generarPlayoffs()}
+                    disabled={generando || parejasActivas < 2}
+                    variant="accent"
+                    className="gap-2"
+                  >
+                    <Zap size={18} />
+                    {generando ? 'Generando...' : categorias.length > 1 && categoriaFiltro
+                      ? `Generar Playoffs ${categorias.find(c => c.id === categoriaFiltro)?.nombre ?? ''}`
+                      : 'Generar Playoffs'}
+                  </Button>
+                </div>
               )}
 
               {parejasActivas < 2 && (

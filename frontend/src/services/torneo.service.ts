@@ -409,12 +409,13 @@ class TorneoService {
     return response.data;
   }
 
-  /** Zonas + tablas en una sola petición (más rápido que listarZonas + N obtenerTablaPosiciones). */
-  async listarZonasConTablas(torneoId: number): Promise<{ zonas: any[]; tablas: any[] }> {
+  /** Zonas + tablas. Si categoriaId se pasa, solo esa categoría (más rápido). */
+  async listarZonasConTablas(torneoId: number, categoriaId?: number): Promise<{ zonas: any[]; tablas: any[] }> {
     if (!torneoId || isNaN(torneoId) || torneoId <= 0) {
       return { zonas: [], tablas: [] };
     }
-    const response = await axios.get(`${API_URL}/torneos/${torneoId}/zonas/tablas`);
+    const params = categoriaId != null ? { categoria_id: categoriaId } : {};
+    const response = await axios.get(`${API_URL}/torneos/${torneoId}/zonas/tablas`, { params });
     return response.data;
   }
 
@@ -493,15 +494,26 @@ class TorneoService {
     return response.data.completa;
   }
 
-  // Playoffs
-  async generarPlayoffs(torneoId: number, clasificadosPorZona: number = 2): Promise<any> {
+  // Playoffs (categoriaId opcional: genera solo esa categoría, como el fixture)
+  async generarPlayoffs(torneoId: number, clasificadosPorZona: number = 2, categoriaId?: number): Promise<any> {
+    const params: Record<string, number> = { clasificados_por_zona: clasificadosPorZona };
+    if (categoriaId != null) params.categoria_id = categoriaId;
     const response = await axios.post(
       `${API_URL}/torneos/${torneoId}/generar-playoffs`,
       {},
-      {
-        ...this.getAuthHeaders(),
-        params: { clasificados_por_zona: clasificadosPorZona }
-      }
+      { ...this.getAuthHeaders(), params }
+    );
+    return response.data;
+  }
+
+  async intercambiarParejasPlayoff(
+    torneoId: number,
+    data: { partido_id_a: number; partido_id_b: number; slot_a: 1 | 2; slot_b: 1 | 2 }
+  ): Promise<{ message: string }> {
+    const response = await axios.post(
+      `${API_URL}/torneos/${torneoId}/playoffs/intercambiar-parejas`,
+      data,
+      this.getAuthHeaders()
     );
     return response.data;
   }

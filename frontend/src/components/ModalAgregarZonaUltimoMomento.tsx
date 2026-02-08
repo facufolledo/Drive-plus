@@ -43,9 +43,10 @@ export default function ModalAgregarZonaUltimoMomento({
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [zonaRecienCreada, setZonaRecienCreada] = useState<{ id: number; nombre: string } | null>(null);
   const [generandoPartidos, setGenerandoPartidos] = useState(false);
+  const [zonasCompletas, setZonasCompletas] = useState<{ parejas?: { id: number }[] }[]>([]);
 
   const parejasEnZona = new Set(
-    zonas.flatMap((z) => (z.parejas || []).map((p: { id: number }) => p.id))
+    (zonasCompletas.length ? zonasCompletas : zonas).flatMap((z) => (z.parejas || []).map((p: { id: number }) => p.id))
   );
   const parejasOpciones = parejasTodas.filter(
     (p) =>
@@ -62,10 +63,18 @@ export default function ModalAgregarZonaUltimoMomento({
       setNombreZona('Zona último momento');
       setSelectedIds([]);
       setLoadingParejas(true);
-      torneoService
-        .listarParejas(torneoId, undefined, undefined)
-        .then((data: Pareja[]) => setParejasTodas(Array.isArray(data) ? data : []))
-        .catch(() => setParejasTodas([]))
+      Promise.all([
+        torneoService.listarParejas(torneoId, undefined, undefined),
+        torneoService.listarZonas(torneoId),
+      ])
+        .then(([parejasData, zonasData]) => {
+          setParejasTodas(Array.isArray(parejasData) ? parejasData : []);
+          setZonasCompletas(Array.isArray(zonasData) ? zonasData : []);
+        })
+        .catch(() => {
+          setParejasTodas([]);
+          setZonasCompletas([]);
+        })
         .finally(() => setLoadingParejas(false));
     }
   }, [isOpen, torneoId, categorias]);

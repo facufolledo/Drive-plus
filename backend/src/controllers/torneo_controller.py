@@ -1357,9 +1357,12 @@ def eliminar_zonas(
 @router.get("/{torneo_id}/zonas/tablas")
 def listar_zonas_con_tablas(
     torneo_id: int,
+    categoria_id: Optional[int] = None,
     db: Session = Depends(get_db)
 ):
-    """Lista todas las zonas del torneo con sus tablas de posiciones en una sola respuesta (evita N+1 requests desde el front)."""
+    """
+    Lista zonas con tablas. Si categoria_id se pasa, solo zonas de esa categoría (más rápido).
+    """
     from ..services.torneo_zona_service import TorneoZonaService
     from ..models.driveplus_models import PerfilUsuario
 
@@ -1367,6 +1370,10 @@ def listar_zonas_con_tablas(
         zonas = TorneoZonaService.listar_zonas(db, torneo_id)
         if not zonas:
             return {"zonas": [], "tablas": []}
+        if categoria_id is not None:
+            zonas = [z for z in zonas if z.get("categoria_id") == categoria_id]
+            if not zonas:
+                return {"zonas": [], "tablas": []}
 
         tablas_result = []
         jugadores_ids = set()
@@ -1976,23 +1983,26 @@ def verificar_zona_completa(
 def generar_playoffs(
     torneo_id: int,
     clasificados_por_zona: int = 2,
+    categoria_id: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user)
 ):
     """
-    Genera el cuadro de playoffs automáticamente
+    Genera el cuadro de playoffs automáticamente.
+    Igual que el fixture: se puede generar por categoría o todas.
     
-    Solo organizadores pueden generar playoffs
-    El torneo debe estar en fase de grupos
+    Solo organizadores pueden generar playoffs.
+    El torneo debe estar en fase de grupos.
     
     - **clasificados_por_zona**: Número de clasificados por zona (default: 2)
+    - **categoria_id**: Si se pasa, solo genera playoffs para esa categoría
     """
     from ..services.torneo_playoff_service import TorneoPlayoffService
     
     try:
         user_id = current_user.id_usuario
         partidos = TorneoPlayoffService.generar_playoffs(
-            db, torneo_id, user_id, clasificados_por_zona
+            db, torneo_id, user_id, clasificados_por_zona, categoria_id
         )
         return {
             "message": "Playoffs generados exitosamente",
@@ -2014,6 +2024,64 @@ def generar_playoffs(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+class IntercambiarParejasPlayoffRequest(BaseModel):
+    """Intercambiar una pareja de un cruce con una pareja de otro cruce (solo partidos pendientes)."""
+    partido_id_a: int
+    partido_id_b: int
+    slot_a: int  # 1 = pareja1, 2 = pareja2
+    slot_b: int  # 1 = pareja1, 2 = pareja2
+
+
+@router.post("/{torneo_id}/playoffs/intercambiar-parejas")
+def intercambiar_parejas_playoff(
+    torneo_id: int,
+    body: IntercambiarParejasPlayoffRequest,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user)
+):
+    """
+    Intercambia parejas entre dos cruces de playoff.
+    Solo organizadores. Solo partidos pendientes (no confirmados ni BYE).
+    """
+    from ..services.torneo_playoff_service import TorneoPlayoffService
+    from ..models.driveplus_models import Partido
+
+    if not TorneoPlayoffService._es_organizador(db, torneo_id, current_user.id_usuario):
+        raise HTTPException(status_code=403, detail="Solo organizadores pueden intercambiar parejas")
+    if body.slot_a not in (1, 2) or body.slot_b not in (1, 2):
+        raise HTTPException(status_code=400, detail="slot_a y slot_b deben ser 1 o 2")
+
+    pa = db.query(Partido).filter(
+        Partido.id_partido == body.partido_id_a,
+        Partido.id_torneo == torneo_id,
+        Partido.fase.in_(['16avos', '8vos', '4tos', 'cuartos', 'semis', 'semifinal', 'final'])
+    ).first()
+    pb = db.query(Partido).filter(
+        Partido.id_partido == body.partido_id_b,
+        Partido.id_torneo == torneo_id,
+        Partido.fase.in_(['16avos', '8vos', '4tos', 'cuartos', 'semis', 'semifinal', 'final'])
+    ).first()
+    if not pa or not pb:
+        raise HTTPException(status_code=404, detail="Uno o ambos partidos no existen o no son de playoff")
+    if pa.categoria_id != pb.categoria_id:
+        raise HTTPException(status_code=400, detail="Los partidos deben ser de la misma categoría")
+    if pa.estado not in ('pendiente',) or pb.estado not in ('pendiente',):
+        raise HTTPException(status_code=400, detail="Solo se pueden intercambiar parejas en partidos pendientes")
+
+    id_a = pa.pareja1_id if body.slot_a == 1 else pa.pareja2_id
+    id_b = pb.pareja1_id if body.slot_b == 1 else pb.pareja2_id
+    if body.slot_a == 1:
+        pa.pareja1_id = id_b
+    else:
+        pa.pareja2_id = id_b
+    if body.slot_b == 1:
+        pb.pareja1_id = id_a
+    else:
+        pb.pareja2_id = id_a
+    db.commit()
+    return {"message": "Parejas intercambiadas correctamente"}
 
 
 @router.get("/{torneo_id}/playoffs")
