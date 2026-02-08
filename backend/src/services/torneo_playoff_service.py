@@ -152,9 +152,13 @@ class TorneoPlayoffService:
                 tabla = resultado.get('tabla', [])
                 
                 for i, pos in enumerate(tabla[:clasificados_por_zona]):
+                    # Usar posición de la tabla (1º, 2º, ...) para que playoffs emparejen 1º vs 2º
+                    posicion_tabla = pos.get('posicion', i + 1)
+                    if not isinstance(posicion_tabla, int):
+                        posicion_tabla = int(posicion_tabla) if posicion_tabla else (i + 1)
                     clasificados.append({
                         'pareja_id': pos['pareja_id'],
-                        'posicion': i + 1,
+                        'posicion': posicion_tabla,
                         'puntos': pos.get('puntos', 0),
                         'rating': pos.get('rating_promedio', 1200),
                         'zona_nombre': zona.nombre
@@ -376,8 +380,12 @@ class TorneoPlayoffService:
                 c['seed'] = i + 1
             return ordenados
 
-        # Orden de zonas para repartir 1º/2º entre mitades
-        nombres_zonas = sorted(zonas.keys())
+        # Orden de zonas = orden de aparición en clasificados (coincide con numero_orden del fixture)
+        nombres_zonas = []
+        for c in clasificados:
+            z = c.get('zona_nombre') or c.get('zona_id') or '_sin_zona'
+            if z != '_sin_zona' and z not in nombres_zonas:
+                nombres_zonas.append(z)
         n_zonas = len(nombres_zonas)
         mid = n_zonas // 2
 
@@ -419,15 +427,21 @@ class TorneoPlayoffService:
 
         # Dentro de cada mitad: primero todos los 1º (por puntos/rating), luego todos los 2º.
         # Así en los emparejamientos (1-8), (4-5), etc. cada par queda 1º vs 2º.
-        def key_posicion_puntos(x: Dict) -> tuple:
-            return (x['posicion'], -x.get('puntos', 0), -x.get('rating', 1200))
+        def _es_primer(p: Dict) -> bool:
+            pos = p.get('posicion')
+            return pos == 1 or pos == '1' or (pos is not None and int(pos) == 1)
 
-        top_1sts = sorted([c for c in top_list if c.get('posicion') == 1], key=key_posicion_puntos)
-        top_2nds = sorted([c for c in top_list if c.get('posicion') != 1], key=key_posicion_puntos)
+        def key_posicion_puntos(x: Dict) -> tuple:
+            pos = x.get('posicion')
+            pos_int = int(pos) if pos is not None else 0
+            return (pos_int, -x.get('puntos', 0), -x.get('rating', 1200))
+
+        top_1sts = sorted([c for c in top_list if _es_primer(c)], key=key_posicion_puntos)
+        top_2nds = sorted([c for c in top_list if not _es_primer(c)], key=key_posicion_puntos)
         top_list = top_1sts + top_2nds
 
-        bottom_1sts = sorted([c for c in bottom_list if c.get('posicion') == 1], key=key_posicion_puntos)
-        bottom_2nds = sorted([c for c in bottom_list if c.get('posicion') != 1], key=key_posicion_puntos)
+        bottom_1sts = sorted([c for c in bottom_list if _es_primer(c)], key=key_posicion_puntos)
+        bottom_2nds = sorted([c for c in bottom_list if not _es_primer(c)], key=key_posicion_puntos)
         bottom_list = bottom_1sts + bottom_2nds
 
         # Asignar seeds: mitad1 a top_list, mitad2 a bottom_list
