@@ -341,12 +341,12 @@ class TorneoPlayoffService:
         bracket_size: int
     ) -> List[Dict]:
         """
-        Reordena clasificados y asigna seeds para que 1º y 2º de la misma zona
-        queden en mitades opuestas del bracket. Así no se vuelven a enfrentar
-        hasta la final (o como mínimo hasta semifinales si hay pocas zonas).
+        Reordena clasificados y asigna seeds respetando:
+        1) En cada cruce de 1ª ronda: un 1º de zona vs un 2º de zona (nunca 1º vs 1º ni 2º vs 2º).
+        2) 1º y 2º de la misma zona en mitades opuestas del bracket para no cruzarse hasta la final.
         """
         mitad1, mitad2 = TorneoPlayoffService._seeds_por_mitad_bracket(bracket_size)
-        
+
         # Agrupar por zona (zona_nombre puede no existir si no hay zonas)
         zonas: Dict[str, List[Dict]] = {}
         sin_zona: List[Dict] = []
@@ -358,52 +358,87 @@ class TorneoPlayoffService:
                 if zona not in zonas:
                     zonas[zona] = []
                 zonas[zona].append(c)
-        
-        # Ordenar cada zona por posición y puntos
+
+        # Ordenar cada zona por posición y puntos (1º, 2º, ...)
         for zona in zonas:
             zonas[zona] = sorted(
                 zonas[zona],
                 key=lambda x: (x['posicion'], -x.get('puntos', 0), -x.get('rating', 1200))
             )
-        
-        # Si no hay zonas (ej. torneo sin fase grupos), usar orden estándar
+
+        # Si no hay zonas (ej. torneo sin fase grupos), usar orden estándar por posición
         if not zonas:
-            for i, c in enumerate(
-                sorted(clasificados, key=lambda x: (x['posicion'], -x.get('puntos', 0), -x.get('rating', 1200)))
-            ):
+            ordenados = sorted(
+                clasificados,
+                key=lambda x: (x['posicion'], -x.get('puntos', 0), -x.get('rating', 1200))
+            )
+            for i, c in enumerate(ordenados):
                 c['seed'] = i + 1
-            return clasificados
-        
-        # Asignar uno de cada zona a cada mitad para evitar cruces hasta la final
-        lista_mitad1: List[Dict] = []
-        lista_mitad2: List[Dict] = []
-        for zona, lista in zonas.items():
-            for i, c in enumerate(lista):
-                if i % 2 == 0:
-                    lista_mitad1.append(c)
+            return ordenados
+
+        # Orden de zonas para repartir 1º/2º entre mitades
+        nombres_zonas = sorted(zonas.keys())
+        n_zonas = len(nombres_zonas)
+        mid = n_zonas // 2
+
+        # Primera mitad de zonas: 1º → mitad superior del bracket, 2º → mitad inferior.
+        # Segunda mitad de zonas: 1º → mitad inferior, 2º → mitad superior.
+        # Así cada mitad del bracket tiene N/2 primeros y N/2 segundos, y misma zona no se repite hasta la final.
+        top_list: List[Dict] = []
+        bottom_list: List[Dict] = []
+        for i, nombre in enumerate(nombres_zonas):
+            lista = zonas[nombre]
+            if len(lista) >= 1:
+                if i < mid:
+                    top_list.append(lista[0])
+                    if len(lista) >= 2:
+                        bottom_list.append(lista[1])
                 else:
-                    lista_mitad2.append(c)
-        
-        # Agregar sin_zona alternando
-        for i, c in enumerate(sin_zona):
+                    bottom_list.append(lista[0])
+                    if len(lista) >= 2:
+                        top_list.append(lista[1])
+        # Clasificados 3º, 4º, etc. (si hay): repartir alternando entre top y bottom
+        for nombre in nombres_zonas:
+            lista = zonas[nombre]
+            for j in range(2, len(lista)):
+                if len(top_list) <= len(bottom_list):
+                    top_list.append(lista[j])
+                else:
+                    bottom_list.append(lista[j])
+
+        # Sin zona: repartir por posición (1º a top, 2º a bottom, etc.)
+        sin_zona_ord = sorted(
+            sin_zona,
+            key=lambda x: (x['posicion'], -x.get('puntos', 0), -x.get('rating', 1200))
+        )
+        for i, c in enumerate(sin_zona_ord):
             if i % 2 == 0:
-                lista_mitad1.append(c)
+                top_list.append(c)
             else:
-                lista_mitad2.append(c)
-        
-        # Ordenar cada mitad por fuerza (mejor primero)
-        for lista in (lista_mitad1, lista_mitad2):
-            lista.sort(key=lambda x: (x['posicion'], -x.get('puntos', 0), -x.get('rating', 1200)))
-        
-        # Asignar seeds de cada mitad
-        for i, c in enumerate(lista_mitad1):
+                bottom_list.append(c)
+
+        # Dentro de cada mitad: primero todos los 1º (por puntos/rating), luego todos los 2º.
+        # Así en los emparejamientos (1-8), (4-5), etc. cada par queda 1º vs 2º.
+        def key_posicion_puntos(x: Dict) -> tuple:
+            return (x['posicion'], -x.get('puntos', 0), -x.get('rating', 1200))
+
+        top_1sts = sorted([c for c in top_list if c.get('posicion') == 1], key=key_posicion_puntos)
+        top_2nds = sorted([c for c in top_list if c.get('posicion') != 1], key=key_posicion_puntos)
+        top_list = top_1sts + top_2nds
+
+        bottom_1sts = sorted([c for c in bottom_list if c.get('posicion') == 1], key=key_posicion_puntos)
+        bottom_2nds = sorted([c for c in bottom_list if c.get('posicion') != 1], key=key_posicion_puntos)
+        bottom_list = bottom_1sts + bottom_2nds
+
+        # Asignar seeds: mitad1 a top_list, mitad2 a bottom_list
+        for i, c in enumerate(top_list):
             if i < len(mitad1):
                 c['seed'] = mitad1[i]
-        for i, c in enumerate(lista_mitad2):
+        for i, c in enumerate(bottom_list):
             if i < len(mitad2):
                 c['seed'] = mitad2[i]
-        
-        return lista_mitad1 + lista_mitad2
+
+        return top_list + bottom_list
     
     @staticmethod
     def _generar_emparejamientos(bracket_size: int) -> List[tuple]:
