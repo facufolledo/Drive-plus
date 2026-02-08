@@ -282,7 +282,7 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
 
     return (
       <div
-        className={`bg-card border-2 rounded-lg overflow-hidden w-[200px] transition-all ${
+        className={`bg-card border-2 rounded-lg overflow-hidden w-[200px] md:w-[220px] transition-all ${
           esSeleccionado
             ? 'border-primary ring-4 ring-primary/50 shadow-lg scale-105'
             : esFinal
@@ -309,14 +309,14 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
               type="button"
               onClick={() => handleSeleccionPareja(idP, 1)}
               disabled={intercambiando}
-              className={`p-1 rounded transition-all disabled:opacity-50 ${
+              className={`p-2 md:p-1 rounded transition-all disabled:opacity-50 min-h-[44px] md:min-h-0 min-w-[44px] md:min-w-0 flex items-center justify-center ${
                 esSeleccionado && primeraSeleccion?.slot === 1
                   ? 'bg-primary text-white ring-2 ring-primary/50'
-                  : 'bg-primary/20 hover:bg-primary/40 text-primary'
+                  : 'bg-primary/20 hover:bg-primary/40 active:bg-primary/50 text-primary'
               }`}
               title={esSeleccionado && primeraSeleccion?.slot === 1 ? 'Seleccionada' : 'Seleccionar para intercambiar'}
             >
-              <ArrowRightLeft size={12} />
+              <ArrowRightLeft size={14} className="md:w-3 md:h-3" />
             </button>
           )}
         </div>
@@ -333,14 +333,14 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
               type="button"
               onClick={() => handleSeleccionPareja(idP, 2)}
               disabled={intercambiando}
-              className={`p-1 rounded transition-all disabled:opacity-50 ${
+              className={`p-2 md:p-1 rounded transition-all disabled:opacity-50 min-h-[44px] md:min-h-0 min-w-[44px] md:min-w-0 flex items-center justify-center ${
                 esSeleccionado && primeraSeleccion?.slot === 2
                   ? 'bg-primary text-white ring-2 ring-primary/50'
-                  : 'bg-primary/20 hover:bg-primary/40 text-primary'
+                  : 'bg-primary/20 hover:bg-primary/40 active:bg-primary/50 text-primary'
               }`}
               title={esSeleccionado && primeraSeleccion?.slot === 2 ? 'Seleccionada' : 'Seleccionar para intercambiar'}
             >
-              <ArrowRightLeft size={12} />
+              <ArrowRightLeft size={14} className="md:w-3 md:h-3" />
             </button>
           )}
         </div>
@@ -348,18 +348,18 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
         {puedeCargarResultado && !modoIntercambiarActivo ? (
           <button
             onClick={() => abrirModalResultado(partido)}
-            className="w-full py-1.5 bg-gradient-to-r from-accent/30 to-yellow-500/30 hover:from-accent/50 hover:to-yellow-500/50 transition-all flex items-center justify-center gap-1 border-t border-accent/20"
+            className="w-full py-2 md:py-1.5 bg-gradient-to-r from-accent/30 to-yellow-500/30 hover:from-accent/50 hover:to-yellow-500/50 active:from-accent/60 active:to-yellow-500/60 transition-all flex items-center justify-center gap-1 border-t border-accent/20 min-h-[44px] md:min-h-0"
           >
-            <Edit3 size={10} className="text-accent" />
-            <span className="text-[10px] font-bold text-accent">Cargar Resultado</span>
+            <Edit3 size={12} className="text-accent" />
+            <span className="text-xs md:text-[10px] font-bold text-accent">Cargar Resultado</span>
           </button>
         ) : partidoFinalizado ? (
-          <div className="py-1.5 bg-green-500/10 flex items-center justify-center gap-1 border-t border-green-500/20">
+          <div className="py-2 md:py-1.5 bg-green-500/10 flex items-center justify-center gap-1 border-t border-green-500/20">
             <Trophy size={10} className="text-green-500" />
             <span className="text-[10px] font-bold text-green-500">Finalizado</span>
           </div>
         ) : !tieneAmbosEquipos && partido.id > 0 ? (
-          <div className="py-1.5 bg-gray-500/10 flex items-center justify-center border-t border-gray-500/20">
+          <div className="py-2 md:py-1.5 bg-gray-500/10 flex items-center justify-center border-t border-gray-500/20">
             <span className="text-[10px] text-textSecondary">Esperando clasificados</span>
           </div>
         ) : null}
@@ -429,21 +429,21 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6">
         <div className="text-center flex-1">
-          <div className="inline-flex items-center gap-2 bg-gradient-to-r from-accent/10 to-primary/10 px-5 py-2 rounded-full">
-            <Trophy className="text-accent" size={20} />
-            <h2 className="text-lg font-bold text-textPrimary">{hayCampeon ? 'Resultados' : 'Fase de Playoffs'}</h2>
-            <Trophy className="text-primary" size={20} />
+          <div className="inline-flex items-center gap-2 bg-gradient-to-r from-accent/10 to-primary/10 px-4 md:px-5 py-2 rounded-full">
+            <Trophy className="text-accent" size={18} />
+            <h2 className="text-base md:text-lg font-bold text-textPrimary">{hayCampeon ? 'Resultados' : 'Fase de Playoffs'}</h2>
+            <Trophy className="text-primary" size={18} />
           </div>
-          <p className="text-textSecondary mt-1 text-sm">Eliminación directa</p>
+          <p className="text-textSecondary mt-1 text-xs md:text-sm">Eliminación directa</p>
         </div>
         
         {/* Botón Intercambiar Parejas */}
         {esOrganizador && !hayCampeon && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col md:flex-row items-center gap-2 w-full md:w-auto">
             {modoIntercambiarActivo && primeraSeleccion && (
-              <div className="text-xs text-textSecondary bg-primary/10 px-3 py-1.5 rounded-lg">
+              <div className="text-xs text-textSecondary bg-primary/10 px-3 py-1.5 rounded-lg text-center">
                 Seleccioná la segunda pareja
               </div>
             )}
@@ -456,20 +456,20 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
                 }
               }}
               disabled={intercambiando}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all disabled:opacity-50 ${
+              className={`flex items-center justify-center gap-2 px-4 py-2.5 md:py-2 rounded-lg font-bold text-sm transition-all disabled:opacity-50 w-full md:w-auto min-h-[44px] md:min-h-0 ${
                 modoIntercambiarActivo
-                  ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30'
-                  : 'bg-primary/20 text-primary hover:bg-primary/30'
+                  ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30 active:bg-red-500/40'
+                  : 'bg-primary/20 text-primary hover:bg-primary/30 active:bg-primary/40'
               }`}
             >
               {modoIntercambiarActivo ? (
                 <>
-                  <X size={16} />
+                  <X size={18} />
                   Cancelar
                 </>
               ) : (
                 <>
-                  <ArrowRightLeft size={16} />
+                  <ArrowRightLeft size={18} />
                   Intercambiar Parejas
                 </>
               )}
