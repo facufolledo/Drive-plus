@@ -196,21 +196,10 @@ class TorneoPlayoffService:
         
         num_byes = bracket_size - num_clasificados
         
-        # Ordenar clasificados: primeros de zona primero, luego segundos, etc.
-        # Dentro de cada grupo, ordenar por puntos y rating
-        clasificados_ordenados = sorted(
-            clasificados,
-            key=lambda x: (-x['posicion'], -x['puntos'], -x['rating'])
+        # Reordenar para evitar que rivales de la misma zona se crucen hasta la final
+        clasificados_ordenados = TorneoPlayoffService._reordenar_clasificados_evitando_rematches_zona(
+            clasificados, bracket_size
         )
-        # Invertir para que los mejores (posicion 1) queden primero
-        clasificados_ordenados = sorted(
-            clasificados,
-            key=lambda x: (x['posicion'], -x['puntos'], -x['rating'])
-        )
-        
-        # Asignar seeds
-        for i, c in enumerate(clasificados_ordenados):
-            c['seed'] = i + 1
         
         # Determinar fases
         fases = TorneoPlayoffService._determinar_fases(bracket_size)
@@ -322,6 +311,95 @@ class TorneoPlayoffService:
             return ['16avos', '8vos', '4tos', 'semis', 'final']
     
     @staticmethod
+    def _seeds_por_mitad_bracket(bracket_size: int) -> tuple:
+        """
+        Retorna (mitad1, mitad2) con los seeds de cada mitad del bracket.
+        Las parejas de la misma zona deben estar en mitades opuestas para
+        no cruzarse hasta la final.
+        """
+        if bracket_size == 2:
+            return ([1], [2])
+        elif bracket_size == 4:
+            return ([1, 4], [2, 3])
+        elif bracket_size == 8:
+            return ([1, 4, 5, 8], [2, 3, 6, 7])
+        elif bracket_size == 16:
+            return ([1, 4, 5, 8, 9, 12, 13, 16], [2, 3, 6, 7, 10, 11, 14, 15])
+        else:
+            m = bracket_size // 2
+            return (list(range(1, m + 1)), list(range(m + 1, bracket_size + 1)))
+    
+    @staticmethod
+    def _reordenar_clasificados_evitando_rematches_zona(
+        clasificados: List[Dict],
+        bracket_size: int
+    ) -> List[Dict]:
+        """
+        Reordena clasificados y asigna seeds para que 1º y 2º de la misma zona
+        queden en mitades opuestas del bracket. Así no se vuelven a enfrentar
+        hasta la final (o como mínimo hasta semifinales si hay pocas zonas).
+        """
+        mitad1, mitad2 = TorneoPlayoffService._seeds_por_mitad_bracket(bracket_size)
+        
+        # Agrupar por zona (zona_nombre puede no existir si no hay zonas)
+        zonas: Dict[str, List[Dict]] = {}
+        sin_zona: List[Dict] = []
+        for c in clasificados:
+            zona = c.get('zona_nombre') or c.get('zona_id') or '_sin_zona'
+            if zona == '_sin_zona':
+                sin_zona.append(c)
+            else:
+                if zona not in zonas:
+                    zonas[zona] = []
+                zonas[zona].append(c)
+        
+        # Ordenar cada zona por posición y puntos
+        for zona in zonas:
+            zonas[zona] = sorted(
+                zonas[zona],
+                key=lambda x: (x['posicion'], -x.get('puntos', 0), -x.get('rating', 1200))
+            )
+        
+        # Si no hay zonas (ej. torneo sin fase grupos), usar orden estándar
+        if not zonas:
+            for i, c in enumerate(
+                sorted(clasificados, key=lambda x: (x['posicion'], -x.get('puntos', 0), -x.get('rating', 1200)))
+            ):
+                c['seed'] = i + 1
+            return clasificados
+        
+        # Asignar uno de cada zona a cada mitad para evitar cruces hasta la final
+        lista_mitad1: List[Dict] = []
+        lista_mitad2: List[Dict] = []
+        for zona, lista in zonas.items():
+            for i, c in enumerate(lista):
+                if i % 2 == 0:
+                    lista_mitad1.append(c)
+                else:
+                    lista_mitad2.append(c)
+        
+        # Agregar sin_zona alternando
+        for i, c in enumerate(sin_zona):
+            if i % 2 == 0:
+                lista_mitad1.append(c)
+            else:
+                lista_mitad2.append(c)
+        
+        # Ordenar cada mitad por fuerza (mejor primero)
+        for lista in (lista_mitad1, lista_mitad2):
+            lista.sort(key=lambda x: (x['posicion'], -x.get('puntos', 0), -x.get('rating', 1200)))
+        
+        # Asignar seeds de cada mitad
+        for i, c in enumerate(lista_mitad1):
+            if i < len(mitad1):
+                c['seed'] = mitad1[i]
+        for i, c in enumerate(lista_mitad2):
+            if i < len(mitad2):
+                c['seed'] = mitad2[i]
+        
+        return lista_mitad1 + lista_mitad2
+    
+    @staticmethod
     def _generar_emparejamientos(bracket_size: int) -> List[tuple]:
         """
         Genera emparejamientos estándar de bracket
@@ -339,7 +417,6 @@ class TorneoPlayoffService:
                 (2, 15), (7, 10), (3, 14), (6, 11)
             ]
         else:
-            # Genérico
             emparejamientos = []
             for i in range(bracket_size // 2):
                 emparejamientos.append((i + 1, bracket_size - i))
