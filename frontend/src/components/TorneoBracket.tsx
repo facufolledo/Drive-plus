@@ -26,10 +26,17 @@ interface TorneoBracketProps {
   onResultadoCargado?: () => void;
 }
 
+/** Id numérico del partido (la API a veces devuelve id como string) */
+function partidoIdNum(partido: Partido): number {
+  const n = Number(partido?.id ?? partido?.id_partido);
+  return Number.isFinite(n) ? n : 0;
+}
+
 export default function TorneoBracket({ partidos, torneoId, esOrganizador, onResultadoCargado }: TorneoBracketProps) {
   const [partidoSeleccionado, setPartidoSeleccionado] = useState<Partido | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
-  const [modoIntercambiar, setModoIntercambiar] = useState<{ partidoId: number; slot: 1 | 2 } | null>(null);
+  const [modoIntercambiarActivo, setModoIntercambiarActivo] = useState(false);
+  const [primeraSeleccion, setPrimeraSeleccion] = useState<{ partidoId: number; slot: 1 | 2 } | null>(null);
   const [intercambiando, setIntercambiando] = useState(false);
   const [svgSize, setSvgSize] = useState({ width: 0, height: 0 });
   const [lines, setLines] = useState<JSX.Element[]>([]);
@@ -204,23 +211,40 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
     onResultadoCargado?.();
   };
 
-  const partidoOrigen = modoIntercambiar ? partidos.find((p) => p.id === modoIntercambiar.partidoId) : null;
-
-  const ejecutarIntercambio = async (partidoIdB: number, slotB: 1 | 2) => {
-    if (!modoIntercambiar || !partidoOrigen) return;
-    setIntercambiando(true);
-    try {
-      await torneoService.intercambiarParejasPlayoff(torneoId, {
-        partido_id_a: partidoOrigen.id,
-        partido_id_b: partidoIdB,
-        slot_a: modoIntercambiar.slot,
-        slot_b: slotB,
-      });
-      setModoIntercambiar(null);
-      onResultadoCargado?.();
-    } finally {
-      setIntercambiando(false);
+  const handleSeleccionPareja = async (partidoId: number, slot: 1 | 2) => {
+    if (!primeraSeleccion) {
+      // Primera selección
+      setPrimeraSeleccion({ partidoId, slot });
+    } else {
+      // Segunda selección - ejecutar intercambio
+      if (primeraSeleccion.partidoId === partidoId && primeraSeleccion.slot === slot) {
+        // Deseleccionar si es la misma
+        setPrimeraSeleccion(null);
+        return;
+      }
+      
+      setIntercambiando(true);
+      try {
+        await torneoService.intercambiarParejasPlayoff(torneoId, {
+          partido_id_a: primeraSeleccion.partidoId,
+          partido_id_b: partidoId,
+          slot_a: primeraSeleccion.slot,
+          slot_b: slot,
+        });
+        setPrimeraSeleccion(null);
+        setModoIntercambiarActivo(false);
+        onResultadoCargado?.();
+      } catch (error) {
+        console.error('Error al intercambiar:', error);
+      } finally {
+        setIntercambiando(false);
+      }
     }
+  };
+
+  const cancelarIntercambio = () => {
+    setPrimeraSeleccion(null);
+    setModoIntercambiarActivo(false);
   };
 
   // PartidoBox component
@@ -232,13 +256,10 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
     const puedeCargarResultado =
       esOrganizador && partido.estado === 'pendiente' && partido.id > 0 && tieneAmbosEquipos;
     const partidoFinalizado = partido.estado === 'confirmado';
-    const esOrigenIntercambiar = modoIntercambiar?.partidoId === partido.id;
-    const esDestinoIntercambiar =
-      esOrganizador &&
-      partido.estado === 'pendiente' &&
-      partido.id > 0 &&
-      modoIntercambiar &&
-      partido.id !== modoIntercambiar.partidoId;
+    const idP = partidoIdNum(partido);
+    
+    const esSeleccionado = primeraSeleccion != null && idP === primeraSeleccion.partidoId;
+    const puedeIntercambiar = modoIntercambiarActivo && partido.estado === 'pendiente' && idP > 0 && (partido.pareja1_id || partido.pareja2_id);
 
     if (esBye) {
       const nombreGanador = partido.pareja1_nombre || partido.pareja2_nombre || 'TBD';
@@ -261,9 +282,9 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
 
     return (
       <div
-        className={`bg-card border-2 rounded-lg overflow-hidden w-[200px] ${
-          esOrigenIntercambiar
-            ? 'border-primary ring-2 ring-primary/50 shadow-lg'
+        className={`bg-card border-2 rounded-lg overflow-hidden w-[200px] transition-all ${
+          esSeleccionado
+            ? 'border-primary ring-4 ring-primary/50 shadow-lg scale-105'
             : esFinal
               ? 'border-accent shadow-lg shadow-accent/20'
               : partidoFinalizado
@@ -283,13 +304,17 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
           >
             {partido.pareja1_nombre || 'TBD'}
           </span>
-          {esDestinoIntercambiar && (
+          {puedeIntercambiar && partido.pareja1_id && (
             <button
               type="button"
-              onClick={() => ejecutarIntercambio(partido.id, 1)}
+              onClick={() => handleSeleccionPareja(idP, 1)}
               disabled={intercambiando}
-              className="p-1 rounded bg-primary/20 hover:bg-primary/40 text-primary disabled:opacity-50"
-              title="Intercambiar con esta pareja"
+              className={`p-1 rounded transition-all disabled:opacity-50 ${
+                esSeleccionado && primeraSeleccion?.slot === 1
+                  ? 'bg-primary text-white ring-2 ring-primary/50'
+                  : 'bg-primary/20 hover:bg-primary/40 text-primary'
+              }`}
+              title={esSeleccionado && primeraSeleccion?.slot === 1 ? 'Seleccionada' : 'Seleccionar para intercambiar'}
             >
               <ArrowRightLeft size={12} />
             </button>
@@ -303,57 +328,24 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
           >
             {partido.pareja2_nombre || 'TBD'}
           </span>
-          {esDestinoIntercambiar && (
+          {puedeIntercambiar && partido.pareja2_id && (
             <button
               type="button"
-              onClick={() => ejecutarIntercambio(partido.id, 2)}
+              onClick={() => handleSeleccionPareja(idP, 2)}
               disabled={intercambiando}
-              className="p-1 rounded bg-primary/20 hover:bg-primary/40 text-primary disabled:opacity-50"
-              title="Intercambiar con esta pareja"
+              className={`p-1 rounded transition-all disabled:opacity-50 ${
+                esSeleccionado && primeraSeleccion?.slot === 2
+                  ? 'bg-primary text-white ring-2 ring-primary/50'
+                  : 'bg-primary/20 hover:bg-primary/40 text-primary'
+              }`}
+              title={esSeleccionado && primeraSeleccion?.slot === 2 ? 'Seleccionada' : 'Seleccionar para intercambiar'}
             >
               <ArrowRightLeft size={12} />
             </button>
           )}
         </div>
-        {esOrigenIntercambiar && (
-          <div className="flex items-center gap-1 p-1.5 border-t border-primary/30 bg-primary/10">
-            <span className="text-[10px] text-textSecondary flex-1">Intercambiar:</span>
-            <button
-              type="button"
-              onClick={() => setModoIntercambiar((m) => (m ? { ...m, slot: 1 } : null))}
-              className={`px-2 py-0.5 rounded text-[10px] font-bold ${modoIntercambiar?.slot === 1 ? 'bg-primary text-white' : 'bg-background text-textSecondary'}`}
-            >
-              1
-            </button>
-            <button
-              type="button"
-              onClick={() => setModoIntercambiar((m) => (m ? { ...m, slot: 2 } : null))}
-              className={`px-2 py-0.5 rounded text-[10px] font-bold ${modoIntercambiar?.slot === 2 ? 'bg-primary text-white' : 'bg-background text-textSecondary'}`}
-            >
-              2
-            </button>
-            <button
-              type="button"
-              onClick={() => setModoIntercambiar(null)}
-              className="p-0.5 rounded hover:bg-background text-textSecondary"
-              title="Cancelar"
-            >
-              <X size={14} />
-            </button>
-          </div>
-        )}
-        {!esOrigenIntercambiar && esOrganizador && partido.estado === 'pendiente' && partido.id > 0 && (partido.pareja1_id || partido.pareja2_id) && (
-          <button
-            type="button"
-            onClick={() => setModoIntercambiar({ partidoId: partido.id, slot: 1 })}
-            className="w-full py-1.5 bg-primary/10 hover:bg-primary/20 transition-all flex items-center justify-center gap-1 border-t border-cardBorder text-primary"
-            title="Intercambiar parejas: elegí luego otro cruce"
-          >
-            <ArrowRightLeft size={10} />
-            <span className="text-[10px] font-bold">Intercambiar</span>
-          </button>
-        )}
-        {!esOrigenIntercambiar && puedeCargarResultado ? (
+        
+        {puedeCargarResultado && !modoIntercambiarActivo ? (
           <button
             onClick={() => abrirModalResultado(partido)}
             className="w-full py-1.5 bg-gradient-to-r from-accent/30 to-yellow-500/30 hover:from-accent/50 hover:to-yellow-500/50 transition-all flex items-center justify-center gap-1 border-t border-accent/20"
@@ -437,13 +429,53 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
       )}
 
       {/* Header */}
-      <div className="text-center mb-6">
-        <div className="inline-flex items-center gap-2 bg-gradient-to-r from-accent/10 to-primary/10 px-5 py-2 rounded-full">
-          <Trophy className="text-accent" size={20} />
-          <h2 className="text-lg font-bold text-textPrimary">{hayCampeon ? 'Resultados' : 'Fase de Playoffs'}</h2>
-          <Trophy className="text-primary" size={20} />
+      <div className="flex items-center justify-between mb-6">
+        <div className="text-center flex-1">
+          <div className="inline-flex items-center gap-2 bg-gradient-to-r from-accent/10 to-primary/10 px-5 py-2 rounded-full">
+            <Trophy className="text-accent" size={20} />
+            <h2 className="text-lg font-bold text-textPrimary">{hayCampeon ? 'Resultados' : 'Fase de Playoffs'}</h2>
+            <Trophy className="text-primary" size={20} />
+          </div>
+          <p className="text-textSecondary mt-1 text-sm">Eliminación directa</p>
         </div>
-        <p className="text-textSecondary mt-1 text-sm">Eliminación directa</p>
+        
+        {/* Botón Intercambiar Parejas */}
+        {esOrganizador && !hayCampeon && (
+          <div className="flex items-center gap-2">
+            {modoIntercambiarActivo && primeraSeleccion && (
+              <div className="text-xs text-textSecondary bg-primary/10 px-3 py-1.5 rounded-lg">
+                Seleccioná la segunda pareja
+              </div>
+            )}
+            <button
+              onClick={() => {
+                if (modoIntercambiarActivo) {
+                  cancelarIntercambio();
+                } else {
+                  setModoIntercambiarActivo(true);
+                }
+              }}
+              disabled={intercambiando}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all disabled:opacity-50 ${
+                modoIntercambiarActivo
+                  ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30'
+                  : 'bg-primary/20 text-primary hover:bg-primary/30'
+              }`}
+            >
+              {modoIntercambiarActivo ? (
+                <>
+                  <X size={16} />
+                  Cancelar
+                </>
+              ) : (
+                <>
+                  <ArrowRightLeft size={16} />
+                  Intercambiar Parejas
+                </>
+              )}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Bracket */}
