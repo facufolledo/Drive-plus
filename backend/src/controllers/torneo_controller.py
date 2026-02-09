@@ -2034,6 +2034,12 @@ class IntercambiarParejasPlayoffRequest(BaseModel):
     slot_b: int  # 1 = pareja1, 2 = pareja2
 
 
+class IntercambiarPartidosPlayoffRequest(BaseModel):
+    """Intercambiar posiciones de dos partidos (cuadros) en el bracket. Intercambia numero_partido."""
+    partido_id_a: int
+    partido_id_b: int
+
+
 @router.delete("/{torneo_id}/playoffs")
 def eliminar_playoffs(
     torneo_id: int,
@@ -2106,6 +2112,47 @@ def intercambiar_parejas_playoff(
         pb.pareja2_id = id_a
     db.commit()
     return {"message": "Parejas intercambiadas correctamente"}
+
+
+@router.post("/{torneo_id}/playoffs/intercambiar-partidos")
+def intercambiar_partidos_playoff(
+    torneo_id: int,
+    body: IntercambiarPartidosPlayoffRequest,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user)
+):
+    """
+    Intercambia las posiciones de dos partidos en el bracket (swap de numero_partido).
+    Así un cuadro completo sube o baja. Misma fase y misma categoría. Solo organizadores.
+    """
+    from ..services.torneo_playoff_service import TorneoPlayoffService
+    from ..models.driveplus_models import Partido
+
+    if not TorneoPlayoffService._es_organizador(db, torneo_id, current_user.id_usuario):
+        raise HTTPException(status_code=403, detail="Solo organizadores pueden intercambiar partidos")
+
+    pa = db.query(Partido).filter(
+        Partido.id_partido == body.partido_id_a,
+        Partido.id_torneo == torneo_id,
+        Partido.fase.in_(['16avos', '8vos', '4tos', 'cuartos', 'semis', 'semifinal', 'final'])
+    ).first()
+    pb = db.query(Partido).filter(
+        Partido.id_partido == body.partido_id_b,
+        Partido.id_torneo == torneo_id,
+        Partido.fase.in_(['16avos', '8vos', '4tos', 'cuartos', 'semis', 'semifinal', 'final'])
+    ).first()
+    if not pa or not pb:
+        raise HTTPException(status_code=404, detail="Uno o ambos partidos no existen o no son de playoff")
+    if pa.fase != pb.fase:
+        raise HTTPException(status_code=400, detail="Solo se pueden intercambiar partidos de la misma fase")
+    if pa.categoria_id != pb.categoria_id:
+        raise HTTPException(status_code=400, detail="Los partidos deben ser de la misma categoría")
+
+    na, nb = pa.numero_partido, pb.numero_partido
+    pa.numero_partido = nb
+    pb.numero_partido = na
+    db.commit()
+    return {"message": "Posiciones de cuadros intercambiadas correctamente"}
 
 
 @router.get("/{torneo_id}/playoffs")

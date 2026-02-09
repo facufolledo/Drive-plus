@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { Trophy, Edit3, Crown, Star, Sparkles, FastForward, ArrowRightLeft, X } from 'lucide-react';
 import ModalCargarResultado from './ModalCargarResultado';
+import { AdminBadge, AdminId } from './AdminBadge';
 import torneoService from '../services/torneo.service';
 
 interface Partido {
@@ -38,6 +39,9 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
   const [modoIntercambiarActivo, setModoIntercambiarActivo] = useState(false);
   const [primeraSeleccion, setPrimeraSeleccion] = useState<{ partidoId: number; slot: 1 | 2 } | null>(null);
   const [intercambiando, setIntercambiando] = useState(false);
+  const [modoIntercambiarCuadros, setModoIntercambiarCuadros] = useState(false);
+  const [partidoCuadroSeleccionado, setPartidoCuadroSeleccionado] = useState<{ partidoId: number; fase: string } | null>(null);
+  const [intercambiandoCuadros, setIntercambiandoCuadros] = useState(false);
   const [svgSize, setSvgSize] = useState({ width: 0, height: 0 });
   const [lines, setLines] = useState<JSX.Element[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -247,8 +251,42 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
     setModoIntercambiarActivo(false);
   };
 
+  const handleSeleccionCuadro = async (partidoId: number, fase: string) => {
+    const idP = partidoId;
+    if (!partidoCuadroSeleccionado) {
+      setPartidoCuadroSeleccionado({ partidoId: idP, fase });
+      return;
+    }
+    if (partidoCuadroSeleccionado.partidoId === idP) {
+      setPartidoCuadroSeleccionado(null);
+      return;
+    }
+    if (partidoCuadroSeleccionado.fase !== fase) {
+      return;
+    }
+    setIntercambiandoCuadros(true);
+    try {
+      await torneoService.intercambiarPartidosPlayoff(torneoId, {
+        partido_id_a: partidoCuadroSeleccionado.partidoId,
+        partido_id_b: idP,
+      });
+      setPartidoCuadroSeleccionado(null);
+      setModoIntercambiarCuadros(false);
+      onResultadoCargado?.();
+    } catch (error) {
+      console.error('Error al intercambiar cuadros:', error);
+    } finally {
+      setIntercambiandoCuadros(false);
+    }
+  };
+
+  const cancelarIntercambioCuadros = () => {
+    setPartidoCuadroSeleccionado(null);
+    setModoIntercambiarCuadros(false);
+  };
+
   // PartidoBox component
-  const PartidoBox = ({ partido, esFinal = false }: { partido: Partido; esFinal?: boolean }) => {
+  const PartidoBox = ({ partido, esFinal = false, faseNombre }: { partido: Partido; esFinal?: boolean; faseNombre?: string }) => {
     const esBye = partido.estado === 'bye';
     const ganadorA = partido.ganador_id === partido.pareja1_id && partido.pareja1_id;
     const ganadorB = partido.ganador_id === partido.pareja2_id && partido.pareja2_id;
@@ -260,6 +298,8 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
     
     const esSeleccionado = primeraSeleccion != null && idP === primeraSeleccion.partidoId;
     const puedeIntercambiar = modoIntercambiarActivo && partido.estado === 'pendiente' && idP > 0 && (partido.pareja1_id || partido.pareja2_id);
+    const esCuadroSeleccionado = modoIntercambiarCuadros && partidoCuadroSeleccionado?.partidoId === idP;
+    const puedeSeleccionarCuadro = modoIntercambiarCuadros && faseNombre && idP > 0 && !esBye;
 
     if (esBye) {
       const nombreGanador = partido.pareja1_nombre || partido.pareja2_nombre || 'TBD';
@@ -282,17 +322,23 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
 
     return (
       <div
+        role={puedeSeleccionarCuadro ? 'button' : undefined}
+        tabIndex={puedeSeleccionarCuadro ? 0 : undefined}
+        onClick={puedeSeleccionarCuadro ? () => handleSeleccionCuadro(idP, faseNombre!) : undefined}
+        onKeyDown={puedeSeleccionarCuadro ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSeleccionCuadro(idP, faseNombre!); } } : undefined}
         className={`bg-card border-2 rounded-lg overflow-hidden w-[200px] md:w-[220px] transition-all ${
-          esSeleccionado
-            ? 'border-primary ring-4 ring-primary/50 shadow-lg scale-105'
-            : esFinal
-              ? 'border-accent shadow-lg shadow-accent/20'
-              : partidoFinalizado
-                ? 'border-green-500/50'
-                : puedeCargarResultado
-                  ? 'border-yellow-500/50'
-                  : 'border-primary/30'
-        }`}
+          esCuadroSeleccionado
+            ? 'border-primary ring-4 ring-primary/50 shadow-lg scale-105 cursor-pointer'
+            : esSeleccionado
+              ? 'border-primary ring-4 ring-primary/50 shadow-lg scale-105'
+              : esFinal
+                ? 'border-accent shadow-lg shadow-accent/20'
+                : partidoFinalizado
+                  ? 'border-green-500/50'
+                  : puedeCargarResultado
+                    ? 'border-yellow-500/50'
+                    : 'border-primary/30'
+        } ${puedeSeleccionarCuadro ? 'cursor-pointer hover:border-primary/60' : ''}`}
       >
         {/* Fila pareja 1 */}
         <div
@@ -304,6 +350,7 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
           >
             {partido.pareja1_nombre || 'TBD'}
           </span>
+          <AdminId id={partido.pareja1_id || 0} prefix="PA" />
           {puedeIntercambiar && partido.pareja1_id && (
             <button
               type="button"
@@ -328,6 +375,7 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
           >
             {partido.pareja2_nombre || 'TBD'}
           </span>
+          <AdminId id={partido.pareja2_id || 0} prefix="PA" />
           {puedeIntercambiar && partido.pareja2_id && (
             <button
               type="button"
@@ -345,7 +393,7 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
           )}
         </div>
         
-        {puedeCargarResultado && !modoIntercambiarActivo ? (
+        {puedeCargarResultado && !modoIntercambiarActivo && !modoIntercambiarCuadros ? (
           <button
             onClick={() => abrirModalResultado(partido)}
             className="w-full py-2 md:py-1.5 bg-gradient-to-r from-accent/30 to-yellow-500/30 hover:from-accent/50 hover:to-yellow-500/50 active:from-accent/60 active:to-yellow-500/60 transition-all flex items-center justify-center gap-1 border-t border-accent/20 min-h-[44px] md:min-h-0"
@@ -439,9 +487,16 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
           <p className="text-textSecondary mt-1 text-xs md:text-sm">Eliminación directa</p>
         </div>
         
-        {/* Botón Intercambiar Parejas */}
+        {/* Botones Intercambiar: cuadros (posiciones) y parejas (slots) */}
         {esOrganizador && !hayCampeon && (
           <div className="flex flex-col md:flex-row items-center gap-2 w-full md:w-auto">
+            {modoIntercambiarCuadros && (
+              <div className="text-xs text-textSecondary bg-primary/10 px-3 py-1.5 rounded-lg text-center">
+                {partidoCuadroSeleccionado
+                  ? 'Elegí el segundo cuadro (misma columna)'
+                  : 'Elegí el primer cuadro a mover'}
+              </div>
+            )}
             {modoIntercambiarActivo && primeraSeleccion && (
               <div className="text-xs text-textSecondary bg-primary/10 px-3 py-1.5 rounded-lg text-center">
                 Seleccioná la segunda pareja
@@ -449,10 +504,39 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
             )}
             <button
               onClick={() => {
+                if (modoIntercambiarCuadros) {
+                  cancelarIntercambioCuadros();
+                } else {
+                  setModoIntercambiarCuadros(true);
+                  setModoIntercambiarActivo(false);
+                  setPrimeraSeleccion(null);
+                }
+              }}
+              disabled={intercambiandoCuadros}
+              className={`flex items-center justify-center gap-2 px-4 py-2.5 md:py-2 rounded-lg font-bold text-sm transition-all disabled:opacity-50 w-full md:w-auto min-h-[44px] md:min-h-0 ${
+                modoIntercambiarCuadros
+                  ? 'bg-primary text-white ring-2 ring-primary/50'
+                  : 'bg-primary/20 text-primary hover:bg-primary/30 active:bg-primary/40'
+              }`}
+              title={modoIntercambiarCuadros ? 'Cancelar' : 'Intercambiar posiciones de dos partidos (ej. cuadro arriba con cuadro abajo)'}
+            >
+              {modoIntercambiarCuadros ? (
+                <>
+                  <X size={18} />
+                  Cancelar cuadros
+                </>
+              ) : (
+                'Intercambiar cuadros'
+              )}
+            </button>
+            <button
+              onClick={() => {
                 if (modoIntercambiarActivo) {
                   cancelarIntercambio();
                 } else {
                   setModoIntercambiarActivo(true);
+                  setModoIntercambiarCuadros(false);
+                  setPartidoCuadroSeleccionado(null);
                 }
               }}
               disabled={intercambiando}
@@ -470,7 +554,7 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
               ) : (
                 <>
                   <ArrowRightLeft size={18} />
-                  Intercambiar Parejas
+                  Intercambiar parejas
                 </>
               )}
             </button>
@@ -528,7 +612,7 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: faseIdx * 0.08 + idx * 0.03 }}
                       >
-                        <PartidoBox partido={partido} esFinal={esFinal} />
+                        <PartidoBox partido={partido} esFinal={esFinal} faseNombre={nombre} />
                       </motion.div>
                     ))}
                   </div>

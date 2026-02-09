@@ -744,6 +744,13 @@ async def partidos_usuario(
     if club_ids:
         clubs_dict = {c.id_club: c for c in db.query(Club).filter(Club.id_club.in_(club_ids)).all()}
     
+    # Obtener categorías de los partidos de torneo
+    from src.models.torneo_models import TorneoCategoria
+    categoria_ids = [p.categoria_id for p in partidos if p.categoria_id]
+    categorias_dict = {}
+    if categoria_ids:
+        categorias_dict = {c.id: c for c in db.query(TorneoCategoria).filter(TorneoCategoria.id.in_(categoria_ids)).all()}
+    
     # Pre-cargar datos de parejas de torneo
     parejas_torneo_dict = {}
     pareja_ids_torneo = set()
@@ -937,11 +944,20 @@ async def partidos_usuario(
         # Obtener creador desde el diccionario
         creador = usuarios_dict.get(partido.id_creador)
         
+        # Obtener categoría si es partido de torneo
+        categoria_nombre = None
+        if partido.categoria_id:
+            categoria_obj = categorias_dict.get(partido.categoria_id)
+            if categoria_obj:
+                categoria_nombre = categoria_obj.nombre
+        
         partidos_completos.append({
             "id_partido": partido.id_partido,
             "fecha": partido.fecha,
             "estado": partido.estado,
             "tipo": partido.tipo if hasattr(partido, 'tipo') else "amistoso",
+            "fase": partido.fase if hasattr(partido, 'fase') and partido.fase else None,
+            "categoria": categoria_nombre,
             "id_creador": partido.id_creador,
             "creado_en": partido.creado_en,
             "id_club": partido.id_club,

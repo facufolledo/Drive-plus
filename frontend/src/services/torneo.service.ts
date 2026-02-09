@@ -528,6 +528,19 @@ class TorneoService {
     return response.data;
   }
 
+  /** Intercambia posiciones de dos partidos (cuadros) en el bracket. */
+  async intercambiarPartidosPlayoff(
+    torneoId: number,
+    data: { partido_id_a: number; partido_id_b: number }
+  ): Promise<{ message: string }> {
+    const response = await axios.post(
+      `${API_URL}/torneos/${torneoId}/playoffs/intercambiar-partidos`,
+      data,
+      this.getAuthHeaders()
+    );
+    return response.data;
+  }
+
   async listarPlayoffs(torneoId: number, categoriaId?: number): Promise<any> {
     const response = await axios.get(`${API_URL}/torneos/${torneoId}/playoffs`, {
       params: categoriaId ? { categoria_id: categoriaId } : {}

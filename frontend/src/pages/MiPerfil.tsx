@@ -5,6 +5,7 @@ import { Trophy, MapPin, Calendar, ChevronDown, ChevronUp, Target, Hand, Trendin
 import Button from '../components/Button';
 import { PartidoCardSkeleton } from '../components/SkeletonLoader';
 import { PlayerLink } from '../components/UserLink';
+import { AdminBadge, AdminId } from '../components/AdminBadge';
 import { apiService } from '../services/api';
 import axios from 'axios';
 
@@ -682,6 +683,7 @@ export default function MiPerfil() {
                         {/* Tipo y Fecha */}
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
                           <div className="flex items-center gap-2 flex-wrap">
+                            <AdminBadge id={partido.id_partido} label="Partido" />
                             <span className={`px-2 md:px-3 py-0.5 md:py-1 rounded-full text-[10px] md:text-xs font-bold ${
                               partido.tipo === 'torneo' 
                                 ? 'bg-accent/20 text-accent' 
@@ -689,6 +691,16 @@ export default function MiPerfil() {
                             }`}>
                               {partido.tipo === 'torneo' ? 'TORNEO' : 'AMISTOSO'}
                             </span>
+                            {partido.fase && (
+                              <span className="px-2 md:px-3 py-0.5 md:py-1 rounded-full text-[10px] md:text-xs font-bold bg-purple-500/20 text-purple-400">
+                                {partido.fase.toUpperCase()}
+                              </span>
+                            )}
+                            {partido.categoria && (
+                              <span className="px-2 md:px-3 py-0.5 md:py-1 rounded-full text-[10px] md:text-xs font-bold bg-blue-500/20 text-blue-400">
+                                {partido.categoria}
+                              </span>
+                            )}
                             <span className="text-textSecondary text-[10px] md:text-xs">
                               {formatearFecha(partido.fecha)}
                             </span>
@@ -707,13 +719,14 @@ export default function MiPerfil() {
                           {/* Mi Equipo */}
                           <div className="col-span-5">
                             {miEquipo.map((jugador, i) => (
-                              <div key={i} className="truncate">
+                              <div key={i} className="truncate flex items-center gap-1">
                                 <PlayerLink 
                                   id={jugador.id_usuario} 
                                   nombre={`${jugador.nombre} ${jugador.apellido}`}
                                   nombreUsuario={jugador.nombre_usuario}
                                   size="sm" 
                                 />
+                                <AdminId id={jugador.id_usuario} prefix="U" />
                               </div>
                             ))}
                           </div>
@@ -733,7 +746,8 @@ export default function MiPerfil() {
                           {/* Equipo Rival */}
                           <div className="col-span-5 text-right">
                             {rivalEquipo.map((jugador, i) => (
-                              <div key={i} className="truncate">
+                              <div key={i} className="truncate flex items-center justify-end gap-1">
+                                <AdminId id={jugador.id_usuario} prefix="U" />
                                 <PlayerLink 
                                   id={jugador.id_usuario} 
                                   nombre={`${jugador.nombre} ${jugador.apellido}`}

@@ -6,6 +6,7 @@ import Card from './Card';
 import Button from './Button';
 import SkeletonLoader from './SkeletonLoader';
 import { PlayerLink } from './UserLink';
+import { AdminBadge, AdminId } from './AdminBadge';
 import ModalHorariosPareja from './ModalHorariosPareja';
 import ModalAgregarZonaUltimoMomento from './ModalAgregarZonaUltimoMomento';
 import ModalMoverParejaZona from './ModalMoverParejaZona';

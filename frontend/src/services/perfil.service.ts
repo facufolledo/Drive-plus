@@ -45,6 +45,8 @@ export interface PartidoHistorial {
   fecha: string;
   estado: string;
   tipo?: string;
+  fase?: string;
+  categoria?: string;
   jugadores: Array<{
     id_usuario: number;
     nombre_usuario: string;

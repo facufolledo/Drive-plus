@@ -21,6 +21,7 @@ import Button from '../components/Button';
 import LoadingSkeleton from '../components/LoadingSkeleton';
 import { PartidoCardSkeleton } from '../components/SkeletonLoader';
 import { PlayerLink } from '../components/UserLink';
+import { AdminBadge, AdminId } from '../components/AdminBadge';
 import { perfilService, PerfilPublico as PerfilPublicoType, EstadisticasJugador, PartidoHistorial } from '../services/perfil.service';
 import { apiService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -590,6 +591,7 @@ export default function PerfilPublico() {
                         {/* Tipo y Fecha */}
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
                           <div className="flex items-center gap-2 flex-wrap">
+                            <AdminBadge id={partido.id_partido} label="Partido" />
                             <span className={`px-2 md:px-3 py-0.5 md:py-1 rounded-full text-[10px] md:text-xs font-bold ${
                               partido.tipo === 'torneo' 
                                 ? 'bg-accent/20 text-accent' 
@@ -597,6 +599,16 @@ export default function PerfilPublico() {
                             }`}>
                               {partido.tipo === 'torneo' ? 'TORNEO' : 'AMISTOSO'}
                             </span>
+                            {partido.fase && (
+                              <span className="px-2 md:px-3 py-0.5 md:py-1 rounded-full text-[10px] md:text-xs font-bold bg-purple-500/20 text-purple-400">
+                                {partido.fase.toUpperCase()}
+                              </span>
+                            )}
+                            {partido.categoria && (
+                              <span className="px-2 md:px-3 py-0.5 md:py-1 rounded-full text-[10px] md:text-xs font-bold bg-blue-500/20 text-blue-400">
+                                {partido.categoria}
+                              </span>
+                            )}
                             <span className="text-textSecondary text-[10px] md:text-xs">
                               {formatearFecha(partido.fecha)}
                             </span>
@@ -615,13 +627,14 @@ export default function PerfilPublico() {
                           {/* Equipo del jugador */}
                           <div className="col-span-5">
                             {miEquipo.map((jugador, i) => (
-                              <div key={i} className="truncate">
+                              <div key={i} className="truncate flex items-center gap-1">
                                 <PlayerLink 
                                   id={jugador.id_usuario} 
                                   nombre={`${jugador.nombre} ${jugador.apellido}`}
                                   nombreUsuario={jugador.nombre_usuario}
                                   size="sm" 
                                 />
+                                <AdminId id={jugador.id_usuario} prefix="U" />
                               </div>
                             ))}
                           </div>
@@ -638,13 +651,14 @@ export default function PerfilPublico() {
                           {/* Equipo rival */}
                           <div className="col-span-5">
                             {rivalEquipo.map((jugador, i) => (
-                              <div key={i} className="truncate">
+                              <div key={i} className="truncate flex items-center gap-1">
                                 <PlayerLink 
                                   id={jugador.id_usuario} 
                                   nombre={`${jugador.nombre} ${jugador.apellido}`}
                                   nombreUsuario={jugador.nombre_usuario}
                                   size="sm" 
                                 />
+                                <AdminId id={jugador.id_usuario} prefix="U" />
                               </div>
                             ))}
                           </div>

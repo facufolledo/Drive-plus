@@ -7,6 +7,7 @@ import Button from '../components/Button';
 import Input from '../components/Input';
 import Pagination from '../components/Pagination';
 import LazyComponent from '../components/LazyComponent';
+import { AdminId } from '../components/AdminBadge';
 import { useDebounce } from '../hooks/useDebounce';
 
 import { apiService } from '../services/api';
@@ -297,7 +298,10 @@ export default function Rankings() {
                           }}
                           className="text-left hover:opacity-80 transition-opacity"
                         >
-                          <p className="text-textPrimary font-bold text-xs md:text-base truncate max-w-[120px] md:max-w-none hover:text-primary transition-colors">{nombreCompleto}</p>
+                          <div className="flex items-center gap-1">
+                            <p className="text-textPrimary font-bold text-xs md:text-base truncate max-w-[120px] md:max-w-none hover:text-primary transition-colors">{nombreCompleto}</p>
+                            <AdminId id={jugador.id_usuario || jugador.id} prefix="U" />
+                          </div>
                           <p className="text-textSecondary text-[10px] md:text-xs truncate max-w-[120px] md:max-w-none">@{jugador.nombre_usuario || 'sin-usuario'}</p>
                         </button>
                       </td>
@@ -424,7 +428,10 @@ export default function Rankings() {
 
                     {/* Nombre y usuario */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-textPrimary font-bold text-xs truncate">{nombreCompleto}</p>
+                      <div className="flex items-center gap-1">
+                        <p className="text-textPrimary font-bold text-xs truncate">{nombreCompleto}</p>
+                        <AdminId id={jugador.id_usuario || jugador.id} prefix="U" />
+                      </div>
                       <p className="text-textSecondary text-[9px] truncate">@{jugador.nombre_usuario}</p>
                     </div>
 

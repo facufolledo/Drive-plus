@@ -29,23 +29,25 @@ class EloConfig:
     
     # === FACTORES K POR EXPERIENCIA ===
     
-    # Rangos de partidos jugados y sus factores K correspondientes (CAPS ESPECÍFICOS)
+    # Rangos de partidos jugados y sus factores K correspondientes (AUMENTADOS PARA PRINCIPIANTES)
+    # Objetivo: Permitir que jugadores iniciales suban ~50 puntos por victoria
+    # Un jugador principiante que gana debería subir aproximadamente 40-60 puntos
     K_FACTORS = {
         "nuevo": {
-            "max_partidos": 5,
-            "k_value": 200   # Ajustado para caps de 350
+            "max_partidos": 15,
+            "k_value": 400   # Muy alto para principiantes (0-15 partidos) - sube ~50 pts por victoria
         },
         "intermedio": {
-            "max_partidos": 15,
-            "k_value": 180   # Ajustado para caps de 350
+            "max_partidos": 30,
+            "k_value": 300   # Alto para jugadores con experiencia media (16-30 partidos)
         },
         "estable": {
-            "max_partidos": 40,
-            "k_value": 20    # Reducido para caps de 50
+            "max_partidos": 60,
+            "k_value": 200   # Moderado para jugadores establecidos (31-60 partidos)
         },
         "experto": {
             "max_partidos": float('inf'),  # Sin límite superior
-            "k_value": 15    # Reducido para caps de 50
+            "k_value": 150   # Más bajo para expertos (61+ partidos)
         }
     }
     
@@ -123,15 +125,15 @@ class EloConfig:
     # === NUEVO: CAPS POR CATEGORÍA DE ORIGEN ===
     
     # Caps específicos según la categoría de origen del jugador.
-    # Máximo ~35-50 por partido para que ganancias tipo +109 no ocurran.
+    # AUMENTADOS para permitir mayor movilidad en categorías bajas
     CATEGORY_ORIGIN_CAPS = {
-        "Principiante": {"win": 50, "loss": -25},
-        "8va": {"win": 50, "loss": -25},
-        "7ma": {"win": 50, "loss": -25},
-        "6ta": {"win": 50, "loss": -25},
-        "5ta": {"win": 50, "loss": -25},
-        "4ta": {"win": 50, "loss": -25},
-        "Libre": {"win": 40, "loss": -20}
+        "Principiante": {"win": 100, "loss": -50},  # Aumentado de 50 a 100 para permitir subidas rápidas
+        "8va": {"win": 80, "loss": -40},            # Aumentado de 50 a 80
+        "7ma": {"win": 70, "loss": -35},            # Aumentado de 50 a 70
+        "6ta": {"win": 60, "loss": -30},            # Aumentado de 50 a 60
+        "5ta": {"win": 50, "loss": -25},            # Mantenido en 50
+        "4ta": {"win": 50, "loss": -25},            # Mantenido en 50
+        "Libre": {"win": 40, "loss": -20}           # Mantenido en 40
     }
     
     # === NUEVO: INACTIVIDAD ===

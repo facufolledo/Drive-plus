@@ -1,12 +1,12 @@
 import requests
 import json
 
-# Test del endpoint de ranking
-BASE_URL = "http://localhost:8000"
+# Test del endpoint de ranking en PRODUCCIÓN
+BASE_URL = "https://drive-plus-production.up.railway.app"
 
-def test_ranking():
-    """Probar endpoint de ranking"""
-    print("🔍 Probando endpoint /ranking/")
+def test_ranking_produccion():
+    """Probar endpoint de ranking en producción"""
+    print("🔍 Probando endpoint /ranking/ en PRODUCCIÓN")
     print("=" * 60)
     
     try:
@@ -41,6 +41,11 @@ def test_ranking():
                     print(f"\n⚠️  Campos faltantes: {', '.join(campos_faltantes)}")
                 else:
                     print(f"\n✅ Todos los campos están presentes")
+                    
+                # Verificar valores
+                if primer_jugador.get('partidos_ganados') == 0 and primer_jugador.get('partidos_jugados', 0) > 0:
+                    print(f"\n⚠️  PROBLEMA: Tiene {primer_jugador.get('partidos_jugados')} partidos jugados pero 0 ganados")
+                    print(f"   Esto indica que el cálculo de partidos_ganados no está funcionando")
         else:
             print(f"Error: {response.text}")
             
@@ -48,4 +53,4 @@ def test_ranking():
         print(f"❌ Error: {e}")
 
 if __name__ == "__main__":
-    test_ranking()
+    test_ranking_produccion()

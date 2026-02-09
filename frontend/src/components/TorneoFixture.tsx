@@ -8,6 +8,7 @@ import SkeletonLoader from './SkeletonLoader';
 import ModalCargarResultado from './ModalCargarResultado';
 import ModalHorariosPareja from './ModalHorariosPareja';
 import ModalCambiarHorario from './ModalCambiarHorario';
+import { AdminBadge, AdminId } from './AdminBadge';
 import html2canvas from 'html2canvas';
 
 interface TorneoFixtureProps {
@@ -693,6 +694,7 @@ export default function TorneoFixture({ torneoId, esOrganizador }: TorneoFixture
                         {/* Header del partido con fecha, hora y cancha */}
                         <div className="flex flex-wrap items-center justify-between gap-2 mb-3 md:mb-4">
                           <div className="flex flex-wrap items-center gap-2 md:gap-3 text-xs md:text-sm text-textSecondary">
+                            <AdminBadge id={partido.id_partido} label="P" />
                             {/* Fecha y hora */}
                             <div className="flex items-center gap-1.5">
                               <div className="bg-primary/10 p-1 md:p-1.5 rounded">
@@ -771,6 +773,7 @@ export default function TorneoFixture({ torneoId, esOrganizador }: TorneoFixture
                               <span className={`font-bold text-xs md:text-base truncate ${ganadorA ? 'text-green-500' : 'text-textPrimary'}`}>
                                 {partido.pareja1_nombre || `Pareja ${partido.pareja1_id}`}
                               </span>
+                              <AdminId id={partido.pareja1_id} prefix="PA" />
                             </div>
                             <div className="flex items-center gap-2">
                               {partido.resultado_padel && (
@@ -797,6 +800,8 @@ export default function TorneoFixture({ torneoId, esOrganizador }: TorneoFixture
                               <span className={`font-bold text-xs md:text-base truncate ${ganadorB ? 'text-green-500' : 'text-textPrimary'}`}>
                                 {partido.pareja2_nombre || `Pareja ${partido.pareja2_id}`}
                               </span>
+                              <AdminId id={partido.pareja2_id} prefix="PA" />
+                            </div>
                             </div>
                             <div className="flex items-center gap-2">
                               {partido.resultado_padel && (

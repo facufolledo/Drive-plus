@@ -4,6 +4,7 @@ import Card from './Card';
 import Button from './Button';
 import SkeletonLoader from './SkeletonLoader';
 import TorneoBracket from './TorneoBracket';
+import { AdminBadge } from './AdminBadge';
 import torneoService, { Categoria } from '../services/torneo.service';
 import { useTorneos } from '../context/TorneosContext';
 
