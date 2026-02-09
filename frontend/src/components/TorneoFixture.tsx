@@ -802,7 +802,6 @@ export default function TorneoFixture({ torneoId, esOrganizador }: TorneoFixture
                               </span>
                               <AdminId id={partido.pareja2_id} prefix="PA" />
                             </div>
-                            </div>
                             <div className="flex items-center gap-2">
                               {partido.resultado_padel && (
                                 <span className={`text-xl md:text-2xl font-bold ${ganadorB ? 'text-green-500' : 'text-textSecondary'}`}>
