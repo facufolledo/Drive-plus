@@ -1361,50 +1361,212 @@ def listar_zonas_con_tablas(
     db: Session = Depends(get_db)
 ):
     """
-    Lista zonas con tablas. Si categoria_id se pasa, solo zonas de esa categoría (más rápido).
+    Lista zonas con tablas OPTIMIZADO - carga todo en batch.
+    Si categoria_id se pasa, solo zonas de esa categoría (más rápido).
     """
     from ..services.torneo_zona_service import TorneoZonaService
-    from ..models.driveplus_models import PerfilUsuario
+    from ..models.driveplus_models import PerfilUsuario, Partido, Usuario
+    from ..models.torneo_models import TorneoZona, TorneoZonaPareja, TorneoPareja
 
     try:
+        # 1. Obtener zonas
         zonas = TorneoZonaService.listar_zonas(db, torneo_id)
         if not zonas:
             return {"zonas": [], "tablas": []}
+        
         if categoria_id is not None:
             zonas = [z for z in zonas if z.get("categoria_id") == categoria_id]
             if not zonas:
                 return {"zonas": [], "tablas": []}
 
-        tablas_result = []
+        zonas_ids = [z["id"] for z in zonas]
+
+        # 2. Cargar TODAS las asignaciones de parejas a zonas en una sola query
+        asignaciones = db.query(TorneoZonaPareja).filter(
+            TorneoZonaPareja.zona_id.in_(zonas_ids)
+        ).all()
+        
+        # Agrupar asignaciones por zona
+        asignaciones_por_zona = {}
+        parejas_ids = set()
+        for asig in asignaciones:
+            if asig.zona_id not in asignaciones_por_zona:
+                asignaciones_por_zona[asig.zona_id] = []
+            asignaciones_por_zona[asig.zona_id].append(asig)
+            parejas_ids.add(asig.pareja_id)
+
+        # 3. Cargar TODAS las parejas en una sola query
+        parejas = db.query(TorneoPareja).filter(TorneoPareja.id.in_(parejas_ids)).all() if parejas_ids else []
+        parejas_dict = {p.id: p for p in parejas}
+
+        # 4. Cargar TODOS los partidos confirmados de estas zonas en una sola query
+        partidos = db.query(Partido).filter(
+            Partido.id_torneo == torneo_id,
+            Partido.zona_id.in_(zonas_ids),
+            Partido.estado == 'confirmado'
+        ).all()
+        
+        # Agrupar partidos por zona
+        partidos_por_zona = {}
         jugadores_ids = set()
-        for z in zonas:
-            tabla = TorneoZonaService.obtener_tabla_posiciones(db, z["id"])
-            for item in tabla.get("tabla", []):
-                if item.get("jugador1_id"):
-                    jugadores_ids.add(item["jugador1_id"])
-                if item.get("jugador2_id"):
-                    jugadores_ids.add(item["jugador2_id"])
+        for partido in partidos:
+            if partido.zona_id not in partidos_por_zona:
+                partidos_por_zona[partido.zona_id] = []
+            partidos_por_zona[partido.zona_id].append(partido)
+
+        # 5. Construir tablas en memoria
+        tablas_result = []
+        for zona in zonas:
+            zona_id = zona["id"]
+            tabla = []
+            
+            # Inicializar tabla con parejas de esta zona
+            for asig in asignaciones_por_zona.get(zona_id, []):
+                pareja = parejas_dict.get(asig.pareja_id)
+                if pareja:
+                    jugadores_ids.add(pareja.jugador1_id)
+                    jugadores_ids.add(pareja.jugador2_id)
+                    tabla.append({
+                        'pareja_id': pareja.id,
+                        'jugador1_id': pareja.jugador1_id,
+                        'jugador2_id': pareja.jugador2_id,
+                        'eliminada': False,
+                        'partidos_jugados': 0,
+                        'partidos_ganados': 0,
+                        'partidos_perdidos': 0,
+                        'sets_ganados': 0,
+                        'sets_perdidos': 0,
+                        'games_ganados': 0,
+                        'games_perdidos': 0,
+                        'puntos': 0
+                    })
+                else:
+                    # Pareja eliminada
+                    tabla.append({
+                        'pareja_id': asig.pareja_id,
+                        'jugador1_id': None,
+                        'jugador2_id': None,
+                        'eliminada': True,
+                        'partidos_jugados': 0,
+                        'partidos_ganados': 0,
+                        'partidos_perdidos': 0,
+                        'sets_ganados': 0,
+                        'sets_perdidos': 0,
+                        'games_ganados': 0,
+                        'games_perdidos': 0,
+                        'puntos': 0
+                    })
+            
+            # Calcular estadísticas con partidos de esta zona
+            for partido in partidos_por_zona.get(zona_id, []):
+                pareja_a_id = partido.pareja1_id
+                pareja_b_id = partido.pareja2_id
+                
+                if not pareja_a_id or not pareja_b_id:
+                    continue
+                
+                idx_a = next((i for i, p in enumerate(tabla) if p['pareja_id'] == pareja_a_id), None)
+                idx_b = next((i for i, p in enumerate(tabla) if p['pareja_id'] == pareja_b_id), None)
+                
+                if idx_a is None or idx_b is None:
+                    continue
+                
+                tabla[idx_a]['partidos_jugados'] += 1
+                tabla[idx_b]['partidos_jugados'] += 1
+                
+                if partido.resultado_padel:
+                    resultado = partido.resultado_padel
+                    sets = resultado.get('sets', [])
+                    
+                    sets_a = 0
+                    sets_b = 0
+                    games_a = 0
+                    games_b = 0
+                    
+                    for set_data in sets:
+                        if set_data.get('completado'):
+                            games_eq_a = set_data.get('gamesEquipoA', 0)
+                            games_eq_b = set_data.get('gamesEquipoB', 0)
+                            
+                            games_a += games_eq_a
+                            games_b += games_eq_b
+                            
+                            if set_data.get('ganador') == 'equipoA':
+                                sets_a += 1
+                            elif set_data.get('ganador') == 'equipoB':
+                                sets_b += 1
+                    
+                    tabla[idx_a]['sets_ganados'] += sets_a
+                    tabla[idx_a]['sets_perdidos'] += sets_b
+                    tabla[idx_a]['games_ganados'] += games_a
+                    tabla[idx_a]['games_perdidos'] += games_b
+                    
+                    tabla[idx_b]['sets_ganados'] += sets_b
+                    tabla[idx_b]['sets_perdidos'] += sets_a
+                    tabla[idx_b]['games_ganados'] += games_b
+                    tabla[idx_b]['games_perdidos'] += games_a
+                    
+                    if partido.ganador_pareja_id == pareja_a_id:
+                        tabla[idx_a]['partidos_ganados'] += 1
+                        tabla[idx_a]['puntos'] += 3
+                        tabla[idx_b]['partidos_perdidos'] += 1
+                    elif partido.ganador_pareja_id == pareja_b_id:
+                        tabla[idx_b]['partidos_ganados'] += 1
+                        tabla[idx_b]['puntos'] += 3
+                        tabla[idx_a]['partidos_perdidos'] += 1
+            
+            # Ordenar tabla
+            tabla.sort(key=lambda x: (
+                -x['puntos'],
+                -(x['sets_ganados'] - x['sets_perdidos']),
+                -(x['games_ganados'] - x['games_perdidos'])
+            ))
+            
+            # Agregar posición
+            for i, item in enumerate(tabla, 1):
+                item['posicion'] = i
+            
             tablas_result.append({
-                "zona_id": z["id"],
-                "zona_nombre": z["nombre"],
-                "categoria_id": z.get("categoria_id"),
-                "tabla": tabla.get("tabla", []),
+                "zona_id": zona_id,
+                "zona_nombre": zona["nombre"],
+                "categoria_id": zona.get("categoria_id"),
+                "tabla": tabla,
             })
 
-        perfiles = db.query(PerfilUsuario).filter(
-            PerfilUsuario.id_usuario.in_(jugadores_ids)
+        # 6. Cargar perfiles y usernames en una sola query
+        usuarios = db.query(Usuario, PerfilUsuario).join(
+            PerfilUsuario, Usuario.id_usuario == PerfilUsuario.id_usuario, isouter=True
+        ).filter(
+            Usuario.id_usuario.in_(jugadores_ids)
         ).all() if jugadores_ids else []
-        perfiles_dict = {p.id_usuario: p for p in perfiles}
+        
+        usuarios_dict = {}
+        for usuario, perfil in usuarios:
+            usuarios_dict[usuario.id_usuario] = {
+                'nombre': perfil.nombre if perfil else None,
+                'apellido': perfil.apellido if perfil else None,
+                'username': usuario.nombre_usuario
+            }
 
+        # 7. Agregar nombres a las tablas
         for t in tablas_result:
             for item in t["tabla"]:
-                perfil1 = perfiles_dict.get(item.get("jugador1_id"))
-                perfil2 = perfiles_dict.get(item.get("jugador2_id"))
-                nombre1 = f"{perfil1.nombre} {perfil1.apellido}" if perfil1 else f"Jugador {item.get('jugador1_id', '')}"
-                nombre2 = f"{perfil2.nombre} {perfil2.apellido}" if perfil2 else f"Jugador {item.get('jugador2_id', '')}"
-                item["jugador1_nombre"] = nombre1 if perfil1 else None
-                item["jugador2_nombre"] = nombre2 if perfil2 else None
-                item["pareja_nombre"] = f"{nombre1} / {nombre2}"
+                if not item['eliminada']:
+                    user1 = usuarios_dict.get(item.get("jugador1_id"))
+                    user2 = usuarios_dict.get(item.get("jugador2_id"))
+                    
+                    if user1:
+                        nombre1 = f"{user1['nombre']} {user1['apellido']}" if user1['nombre'] else f"Jugador {item['jugador1_id']}"
+                        item["jugador1_nombre"] = nombre1
+                        item["jugador1_username"] = user1['username']
+                    
+                    if user2:
+                        nombre2 = f"{user2['nombre']} {user2['apellido']}" if user2['nombre'] else f"Jugador {item['jugador2_id']}"
+                        item["jugador2_nombre"] = nombre2
+                        item["jugador2_username"] = user2['username']
+                    
+                    if user1 and user2:
+                        item["pareja_nombre"] = f"{item['jugador1_nombre']} / {item['jugador2_nombre']}"
 
         return {"zonas": zonas, "tablas": tablas_result}
     except Exception as e:
