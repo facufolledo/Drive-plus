@@ -19,6 +19,20 @@ def _get_ranking_from_db(db: Session, limit: int, offset: int, sexo: Optional[st
     from ..models.torneo_models import TorneoPareja
     from sqlalchemy import text
     
+    # Subquery para calcular partidos JUGADOS desde historial_rating
+    partidos_jugados_subq = (
+        db.query(
+            HistorialRating.id_usuario,
+            func.count(func.distinct(HistorialRating.id_partido)).label("partidos_jugados_real")
+        )
+        .join(Partido, HistorialRating.id_partido == Partido.id_partido)
+        .filter(
+            Partido.estado.in_(["finalizado", "confirmado"])
+        )
+        .group_by(HistorialRating.id_usuario)
+        .subquery()
+    )
+    
     # Subquery para calcular partidos ganados desde historial_rating
     partidos_ganados_subq = (
         db.query(
@@ -53,7 +67,7 @@ def _get_ranking_from_db(db: Session, limit: int, offset: int, sexo: Optional[st
             Usuario.id_usuario,
             Usuario.nombre_usuario,
             Usuario.rating,
-            Usuario.partidos_jugados,
+            func.coalesce(partidos_jugados_subq.c.partidos_jugados_real, 0).label("partidos_jugados"),
             Usuario.sexo,
             PerfilUsuario.nombre,
             PerfilUsuario.apellido,
@@ -66,6 +80,7 @@ def _get_ranking_from_db(db: Session, limit: int, offset: int, sexo: Optional[st
         )
         .join(PerfilUsuario, Usuario.id_usuario == PerfilUsuario.id_usuario, isouter=True)
         .join(Categoria, Usuario.id_categoria == Categoria.id_categoria, isouter=True)
+        .join(partidos_jugados_subq, Usuario.id_usuario == partidos_jugados_subq.c.id_usuario, isouter=True)
         .join(partidos_ganados_subq, Usuario.id_usuario == partidos_ganados_subq.c.id_usuario, isouter=True)
         .join(tendencia_subq, Usuario.id_usuario == tendencia_subq.c.id_usuario, isouter=True)
     )
