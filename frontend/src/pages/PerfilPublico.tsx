@@ -82,6 +82,41 @@ export default function PerfilPublico() {
     return null;
   };
 
+  // Función para obtener categoría según rating
+  const obtenerCategoriaPorRating = (rating: number): string => {
+    if (rating >= 1800) return 'Libre';
+    if (rating >= 1600) return '4ta';
+    if (rating >= 1400) return '5ta';
+    if (rating >= 1200) return '6ta';
+    if (rating >= 1000) return '7ma';
+    if (rating >= 500) return '8va';
+    return 'Principiante';
+  };
+
+  // Función para detectar cambio de categoría
+  const detectarCambioCategoria = (partido: PartidoHistorial): { hubo: boolean; tipo: 'ascenso' | 'descenso' | null; categoriaAnterior: string; categoriaNueva: string } | null => {
+    if (!partido.historial_rating) return null;
+    
+    const catAnterior = obtenerCategoriaPorRating(partido.historial_rating.rating_antes);
+    const catNueva = obtenerCategoriaPorRating(partido.historial_rating.rating_despues);
+    
+    if (catAnterior !== catNueva) {
+      // Determinar si es ascenso o descenso
+      const categorias = ['Principiante', '8va', '7ma', '6ta', '5ta', '4ta', 'Libre'];
+      const indexAnterior = categorias.indexOf(catAnterior);
+      const indexNueva = categorias.indexOf(catNueva);
+      
+      return {
+        hubo: true,
+        tipo: indexNueva > indexAnterior ? 'ascenso' : 'descenso',
+        categoriaAnterior: catAnterior,
+        categoriaNueva: catNueva
+      };
+    }
+    
+    return null;
+  };
+
   const cargarPerfil = async (username: string) => {
     try {
       setLoading(true);
@@ -575,19 +610,52 @@ export default function PerfilPublico() {
                     const victoria = esVictoria(partido);
                     const miEquipo = obtenerEquipoUsuario(partido);
                     const rivalEquipo = obtenerEquipoRival(partido);
+                    const cambioCategoria = detectarCambioCategoria(partido);
 
                     return (
-                      <motion.div
-                        key={partido.id_partido}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.05 }}
-                        className={`relative rounded-lg p-3 md:p-4 border-l-4 ${
-                          victoria
-                            ? 'bg-green-500/20 border-green-500 shadow-green-500/20 shadow-lg'
-                            : 'bg-red-500/20 border-red-500 shadow-red-500/20 shadow-lg'
-                        }`}
-                      >
+                      <div key={partido.id_partido}>
+                        {/* Indicador de Cambio de Categoría */}
+                        {cambioCategoria?.hubo && (
+                          <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className={`mb-2 p-2 md:p-3 rounded-lg border-2 ${
+                              cambioCategoria.tipo === 'ascenso'
+                                ? 'bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-green-500/50'
+                                : 'bg-gradient-to-r from-orange-500/10 to-red-500/10 border-orange-500/50'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 justify-center">
+                              {cambioCategoria.tipo === 'ascenso' ? (
+                                <TrendingUp className="text-green-400" size={16} />
+                              ) : (
+                                <TrendingDown className="text-orange-400" size={16} />
+                              )}
+                              <span className={`text-xs md:text-sm font-bold ${
+                                cambioCategoria.tipo === 'ascenso' ? 'text-green-400' : 'text-orange-400'
+                              }`}>
+                                {cambioCategoria.tipo === 'ascenso' ? '¡ASCENDIÓ!' : 'DESCENDIÓ'} {cambioCategoria.categoriaAnterior} → {cambioCategoria.categoriaNueva}
+                              </span>
+                              {cambioCategoria.tipo === 'ascenso' ? (
+                                <Trophy className="text-green-400" size={16} />
+                              ) : (
+                                <TrendingDown className="text-orange-400" size={16} />
+                              )}
+                            </div>
+                          </motion.div>
+                        )}
+
+                        {/* Card del Partido */}
+                        <motion.div
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: index * 0.05 }}
+                          className={`relative rounded-lg p-3 md:p-4 border-l-4 ${
+                            victoria
+                              ? 'bg-green-500/20 border-green-500 shadow-green-500/20 shadow-lg'
+                              : 'bg-red-500/20 border-red-500 shadow-red-500/20 shadow-lg'
+                          }`}
+                        >
                         {/* Tipo y Fecha */}
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
                           <div className="flex items-center gap-2 flex-wrap">
@@ -664,6 +732,7 @@ export default function PerfilPublico() {
                           </div>
                         </div>
                       </motion.div>
+                      </div>
                     );
                   })
                 )}
