@@ -1,51 +1,35 @@
+import os
 import requests
-import json
+from dotenv import load_dotenv
 
-# Test del endpoint de ranking
-BASE_URL = "http://localhost:8000"
+# Cargar variables de entorno
+load_dotenv('.env.production')
 
-def test_ranking():
-    """Probar endpoint de ranking"""
-    print("🔍 Probando endpoint /ranking/")
-    print("=" * 60)
+API_URL = "https://drive-plus-production.up.railway.app"
+
+try:
+    # Llamar al endpoint de ranking
+    response = requests.get(f"{API_URL}/ranking/?limit=10")
     
-    try:
-        response = requests.get(f"{BASE_URL}/ranking/", params={"limit": 5})
+    if response.status_code == 200:
+        data = response.json()
+        print("✅ Respuesta exitosa del endpoint:\n")
         
-        print(f"Status Code: {response.status_code}")
-        print(f"\nRespuesta:")
+        for i, jugador in enumerate(data[:5], 1):
+            print(f"{i}. {jugador.get('nombre')} {jugador.get('apellido')}")
+            print(f"   Rating: {jugador.get('rating')}")
+            print(f"   Partidos jugados: {jugador.get('partidos_jugados')}")
+            print(f"   Partidos ganados: {jugador.get('partidos_ganados')}")
+            
+            # Calcular winrate
+            pj = jugador.get('partidos_jugados', 0)
+            pg = jugador.get('partidos_ganados', 0)
+            winrate = round((pg / pj * 100) if pj > 0 else 0)
+            print(f"   Winrate: {winrate}%")
+            print(f"   Tendencia: {jugador.get('tendencia')}")
+            print()
+    else:
+        print(f"❌ Error {response.status_code}: {response.text}")
         
-        if response.status_code == 200:
-            data = response.json()
-            print(json.dumps(data, indent=2, ensure_ascii=False))
-            
-            # Verificar campos importantes
-            if data and len(data) > 0:
-                primer_jugador = data[0]
-                print(f"\n✅ Primer jugador:")
-                print(f"   - ID: {primer_jugador.get('id_usuario')}")
-                print(f"   - Nombre: {primer_jugador.get('nombre')} {primer_jugador.get('apellido')}")
-                print(f"   - Rating: {primer_jugador.get('rating')}")
-                print(f"   - Partidos jugados: {primer_jugador.get('partidos_jugados')}")
-                print(f"   - Partidos ganados: {primer_jugador.get('partidos_ganados')}")
-                print(f"   - Tendencia: {primer_jugador.get('tendencia')}")
-                
-                # Verificar si los campos existen
-                campos_faltantes = []
-                if 'partidos_ganados' not in primer_jugador:
-                    campos_faltantes.append('partidos_ganados')
-                if 'tendencia' not in primer_jugador:
-                    campos_faltantes.append('tendencia')
-                
-                if campos_faltantes:
-                    print(f"\n⚠️  Campos faltantes: {', '.join(campos_faltantes)}")
-                else:
-                    print(f"\n✅ Todos los campos están presentes")
-        else:
-            print(f"Error: {response.text}")
-            
-    except Exception as e:
-        print(f"❌ Error: {e}")
-
-if __name__ == "__main__":
-    test_ranking()
+except Exception as e:
+    print(f"❌ Error: {e}")
