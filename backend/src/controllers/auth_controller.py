@@ -139,13 +139,10 @@ async def firebase_auth(
     Verifica el token de Firebase y retorna información del usuario
     """
     try:
-        print(f"🔍 Intentando autenticar con Firebase...")
-        
         # Validar token de Firebase
         firebase_payload = FirebaseHandler.verify_token(request.firebase_token)
         
         if not firebase_payload:
-            print("❌ Token de Firebase inválido o Firebase no inicializado")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Token de Firebase inválido o servicio no disponible",
@@ -153,10 +150,8 @@ async def firebase_auth(
             )
         
         firebase_email = firebase_payload.get("firebase_email")
-        print(f"✅ Token validado para email: {firebase_email}")
         
         if not firebase_email:
-            print("❌ Email no encontrado en token de Firebase")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Token de Firebase inválido: email no encontrado",
@@ -167,25 +162,19 @@ async def firebase_auth(
         user = db.query(Usuario).filter(Usuario.email == firebase_email).first()
         
         if not user:
-            print(f"❌ Usuario no encontrado en BD para email: {firebase_email}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Usuario no encontrado. Por favor, completa tu perfil primero.",
             )
         
-        print(f"✅ Usuario encontrado: {user.nombre_usuario} (ID: {user.id_usuario})")
-        
         # Obtener perfil del usuario
         perfil = db.query(PerfilUsuario).filter(PerfilUsuario.id_usuario == user.id_usuario).first()
         
         if not perfil:
-            print(f"❌ Perfil no encontrado para usuario ID: {user.id_usuario}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Perfil de usuario no encontrado",
             )
-        
-        print(f"✅ Perfil encontrado: {perfil.nombre} {perfil.apellido}")
         
         return UserResponse(
             id_usuario=user.id_usuario,
@@ -213,10 +202,7 @@ async def firebase_auth(
         # Re-lanzar HTTPException tal cual
         raise
     except Exception as e:
-        # Capturar cualquier otro error y loguearlo
-        print(f"❌ Error inesperado en firebase_auth: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        # Capturar cualquier otro error
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error interno del servidor: {str(e)}"
