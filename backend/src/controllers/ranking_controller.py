@@ -292,3 +292,25 @@ async def get_historial_elo(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error al obtener el historial: {str(e)}"
         )
+
+
+@router.post("/clear-cache")
+async def clear_ranking_cache(
+    current_user: Usuario = Depends(get_current_user)
+):
+    """Limpiar caché de rankings (solo administradores)"""
+    
+    if not current_user.es_administrador:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo administradores pueden limpiar el caché"
+        )
+    
+    try:
+        cache.delete_pattern("ranking")
+        return {"message": "Caché de rankings limpiado exitosamente"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al limpiar caché: {str(e)}"
+        )
