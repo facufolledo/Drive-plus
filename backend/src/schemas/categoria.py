@@ -33,9 +33,14 @@ class JugadorCategoriaResponse(BaseModel):
     """Esquema para respuesta de jugador en categoría"""
     id_usuario: int
     nombre_usuario: str
+    nombre: Optional[str] = ""
+    apellido: Optional[str] = ""
     rating: int
     partidos_jugados: int
+    partidos_ganados: Optional[int] = 0
     sexo: str
+    imagen_url: Optional[str] = None
+    tendencia: Optional[str] = "neutral"
     
     class Config:
         from_attributes = True
