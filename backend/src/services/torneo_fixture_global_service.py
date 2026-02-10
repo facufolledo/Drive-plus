@@ -74,7 +74,7 @@ class TorneoFixtureGlobalService:
             }
             
             for categoria in categorias:
-                print(f"\n🔄 Generando fixture para categoría {categoria.nombre} (ID {categoria.id})...")
+# DEBUG: print(f"\n🔄 Generando fixture para categoría {categoria.nombre} (ID {categoria.id})...")
                 try:
                     resultado_cat = TorneoFixtureGlobalService._generar_fixture_categoria(
                         db, torneo_id, user_id, categoria.id
@@ -87,7 +87,7 @@ class TorneoFixtureGlobalService:
                     resultado_total["partidos"].extend(resultado_cat["partidos"])
                     resultado_total["partidos_sin_programar"].extend(resultado_cat["partidos_sin_programar"])
                     
-                    print(f"   ✅ {resultado_cat['partidos_generados']} partidos programados")
+# DEBUG: print(f"   ✅ {resultado_cat['partidos_generados']} partidos programados")
                 except Exception as e:
                     print(f"   ⚠️  Error en categoría {categoria.nombre}: {e}")
                     continue
@@ -143,7 +143,7 @@ class TorneoFixtureGlobalService:
             Partido.fecha_hora.isnot(None)
         ).all()
         
-        print(f"   📊 Partidos existentes de otras categorías: {len(partidos_existentes)}")
+# DEBUG: print(f"   📊 Partidos existentes de otras categorías: {len(partidos_existentes)}")
         
         # Generar todos los partidos de todas las zonas
         todos_partidos = []
@@ -271,22 +271,22 @@ class TorneoFixtureGlobalService:
         for pareja_id in parejas_ids:
             pareja = db.query(TorneoPareja).filter(TorneoPareja.id == pareja_id).first()
             if not pareja:
-                print(f"⚠️  Pareja {pareja_id} no encontrada en DB")
+# DEBUG: print(f"⚠️  Pareja {pareja_id} no encontrada en DB")
                 continue
             
             restricciones_raw = pareja.disponibilidad_horaria
             
             # 🔴 LOGGING CRÍTICO: Ver datos crudos
-            print(f"\n🔍 Pareja #{pareja_id}:")
-            print(f"   Raw DB: {restricciones_raw}")
-            print(f"   Tipo: {type(restricciones_raw)}")
+# DEBUG: print(f"\n🔍 Pareja #{pareja_id}:")
+# DEBUG: print(f"   Raw DB: {restricciones_raw}")
+# DEBUG: print(f"   Tipo: {type(restricciones_raw)}")
             
             # Parseo robusto con múltiples formatos
             franjas_restricciones = []
             
             if not restricciones_raw:
                 # Caso 1: None o vacío → Sin restricciones
-                print(f"   ✅ Sin restricciones (disponible siempre)")
+# DEBUG: print(f"   ✅ Sin restricciones (disponible siempre)")
                 resultado[pareja_id] = {
                     'restricciones_por_dia': {},
                     'raw': None
@@ -296,25 +296,25 @@ class TorneoFixtureGlobalService:
             elif isinstance(restricciones_raw, list):
                 # Caso 2: Lista directa [{'dias': [...], 'horaInicio': ..., 'horaFin': ...}]
                 franjas_restricciones = restricciones_raw
-                print(f"   📋 Formato: lista directa con {len(franjas_restricciones)} franjas")
+# DEBUG: print(f"   📋 Formato: lista directa con {len(franjas_restricciones)} franjas")
             
             elif isinstance(restricciones_raw, dict):
                 # Caso 3: Dict con 'franjas' key
                 if 'franjas' in restricciones_raw:
                     franjas_restricciones = restricciones_raw['franjas']
-                    print(f"   📋 Formato: dict con franjas ({len(franjas_restricciones)} franjas)")
+# DEBUG: print(f"   📋 Formato: dict con franjas ({len(franjas_restricciones)} franjas)")
                 # Caso 4: Dict con 'restricciones_por_dia' (ya procesado)
                 elif 'restricciones_por_dia' in restricciones_raw:
-                    print(f"   📋 Formato: ya procesado")
+# DEBUG: print(f"   📋 Formato: ya procesado")
                     resultado[pareja_id] = restricciones_raw
                     continue
                 # Caso 5: Dict directo con dias/horaInicio/horaFin
                 elif 'dias' in restricciones_raw and 'horaInicio' in restricciones_raw:
                     franjas_restricciones = [restricciones_raw]
-                    print(f"   📋 Formato: dict directo (convertido a lista)")
+# DEBUG: print(f"   📋 Formato: dict directo (convertido a lista)")
                 else:
                     # Caso 6: Dict con estructura desconocida → tratar como sin restricciones
-                    print(f"   ⚠️  Dict sin estructura conocida → tratando como sin restricciones")
+# DEBUG: print(f"   ⚠️  Dict sin estructura conocida → tratando como sin restricciones")
                     resultado[pareja_id] = {
                         'restricciones_por_dia': {},
                         'raw': restricciones_raw
@@ -335,7 +335,7 @@ class TorneoFixtureGlobalService:
             
             for idx, franja in enumerate(franjas_restricciones):
                 if not isinstance(franja, dict):
-                    print(f"   ⚠️  Franja {idx} no es dict: {franja}")
+# DEBUG: print(f"   ⚠️  Franja {idx} no es dict: {franja}")
                     continue
                 
                 dias = franja.get('dias', [])
@@ -343,7 +343,7 @@ class TorneoFixtureGlobalService:
                 hora_fin = franja.get('horaFin') or franja.get('hora_fin') or franja.get('hasta', '23:59')
                 
                 if not dias:
-                    print(f"   ⚠️  Franja {idx} sin días: {franja}")
+# DEBUG: print(f"   ⚠️  Franja {idx} sin días: {franja}")
                     continue
                 
                 # Convertir a minutos
@@ -360,7 +360,7 @@ class TorneoFixtureGlobalService:
                     if dia_norm not in restricciones_por_dia:
                         restricciones_por_dia[dia_norm] = []
                     restricciones_por_dia[dia_norm].append((inicio_mins, fin_mins))
-                    print(f"   🚫 {dia_norm}: NO puede {hora_inicio}-{hora_fin} ({inicio_mins}-{fin_mins} mins)")
+# DEBUG: print(f"   🚫 {dia_norm}: NO puede {hora_inicio}-{hora_fin} ({inicio_mins}-{fin_mins} mins)")
             
             resultado[pareja_id] = {
                 'restricciones_por_dia': restricciones_por_dia,
@@ -368,7 +368,7 @@ class TorneoFixtureGlobalService:
             }
             
             if not restricciones_por_dia:
-                print(f"   ⚠️  Después de parsear: SIN restricciones válidas")
+# DEBUG: print(f"   ⚠️  Después de parsear: SIN restricciones válidas")
         
         return resultado
     
@@ -551,7 +551,7 @@ class TorneoFixtureGlobalService:
             datos_pareja1 = parejas_disponibilidad.get(pareja1_id, {'restricciones_por_dia': {}})
             datos_pareja2 = parejas_disponibilidad.get(pareja2_id, {'restricciones_por_dia': {}})
             
-            print(f"\n🎾 Buscando slot para partido: Pareja {pareja1_id} vs Pareja {pareja2_id}")
+# DEBUG: print(f"\n🎾 Buscando slot para partido: Pareja {pareja1_id} vs Pareja {pareja2_id}")
             
             # Buscar slot compatible
             slot_asignado = None
@@ -561,16 +561,16 @@ class TorneoFixtureGlobalService:
                 # 1. VERIFICAR DISPONIBILIDAD HORARIA
                 hora_mins = int(hora.split(':')[0]) * 60 + int(hora.split(':')[1])
                 
-                print(f"   🔍 Evaluando slot: {fecha} {dia} {hora} ({hora_mins} mins)")
+# DEBUG: print(f"   🔍 Evaluando slot: {fecha} {dia} {hora} ({hora_mins} mins)")
                 
                 # Verificar pareja 1
-                print(f"      Verificando Pareja {pareja1_id}:")
+# DEBUG: print(f"      Verificando Pareja {pareja1_id}:")
                 pareja1_disponible = TorneoFixtureGlobalService._verificar_disponibilidad_pareja(
                     dia, hora_mins, datos_pareja1
                 )
                 
                 # Verificar pareja 2
-                print(f"      Verificando Pareja {pareja2_id}:")
+# DEBUG: print(f"      Verificando Pareja {pareja2_id}:")
                 pareja2_disponible = TorneoFixtureGlobalService._verificar_disponibilidad_pareja(
                     dia, hora_mins, datos_pareja2
                 )
@@ -610,7 +610,7 @@ class TorneoFixtureGlobalService:
                     continue
                 
                 # ✅ SLOT VÁLIDO ENCONTRADO
-                print(f"      ✅ SLOT VÁLIDO - Cancha {cancha_libre.nombre}")
+# DEBUG: print(f"      ✅ SLOT VÁLIDO - Cancha {cancha_libre.nombre}")
                 slot_asignado = (fecha, dia, hora)
                 cancha_asignada = cancha_libre
                 break
@@ -719,22 +719,22 @@ class TorneoFixtureGlobalService:
         restricciones_por_dia = datos_pareja.get('restricciones_por_dia', {})
         
         # 🔴 LOGGING DETALLADO
-        print(f"      🔍 Verificando {dia} {hora_mins//60:02d}:{hora_mins%60:02d}")
-        print(f"         Restricciones: {restricciones_por_dia}")
+# DEBUG: print(f"      🔍 Verificando {dia} {hora_mins//60:02d}:{hora_mins%60:02d}")
+# DEBUG: print(f"         Restricciones: {restricciones_por_dia}")
         
         # Sin restricciones = disponible siempre
         if not restricciones_por_dia:
-            print(f"         ✅ Sin restricciones → DISPONIBLE")
+# DEBUG: print(f"         ✅ Sin restricciones → DISPONIBLE")
             return True
         
         # Verificar si el día tiene restricciones
         if dia not in restricciones_por_dia:
-            print(f"         ✅ Día sin restricciones → DISPONIBLE")
+# DEBUG: print(f"         ✅ Día sin restricciones → DISPONIBLE")
             return True  # Día sin restricciones = disponible todo el día
         
         # Verificar si la hora está en alguna restricción
         rangos_restringidos = restricciones_por_dia[dia]
-        print(f"         Rangos restringidos en {dia}: {rangos_restringidos}")
+# DEBUG: print(f"         Rangos restringidos en {dia}: {rangos_restringidos}")
         
         for inicio_mins, fin_mins in rangos_restringidos:
             # 🔴 FIX CRÍTICO: Verificar solapamiento correcto
@@ -748,12 +748,12 @@ class TorneoFixtureGlobalService:
             # Y el partido termina DESPUÉS del inicio de la restricción
             if hora_mins < fin_mins and partido_fin > inicio_mins:
                 print(f"         ❌ SOLAPAMIENTO con restricción {inicio_mins//60:02d}:{inicio_mins%60:02d}-{fin_mins//60:02d}:{fin_mins%60:02d}")
-                print(f"            Partido: {hora_mins//60:02d}:{hora_mins%60:02d}-{partido_fin//60:02d}:{partido_fin%60:02d}")
-                print(f"            Restricción: {inicio_mins//60:02d}:{inicio_mins%60:02d}-{fin_mins//60:02d}:{fin_mins%60:02d}")
-                print(f"            Condición: {hora_mins} <= {fin_mins} AND {partido_fin} > {inicio_mins}")
+# DEBUG: print(f"            Partido: {hora_mins//60:02d}:{hora_mins%60:02d}-{partido_fin//60:02d}:{partido_fin%60:02d}")
+# DEBUG: print(f"            Restricción: {inicio_mins//60:02d}:{inicio_mins%60:02d}-{fin_mins//60:02d}:{fin_mins%60:02d}")
+# DEBUG: print(f"            Condición: {hora_mins} <= {fin_mins} AND {partido_fin} > {inicio_mins}")
                 return False  # Hay solapamiento = NO disponible
         
-        print(f"         ✅ Sin solapamiento → DISPONIBLE")
+# DEBUG: print(f"         ✅ Sin solapamiento → DISPONIBLE")
         return True  # No hay solapamiento con ninguna restricción = disponible
     
     @staticmethod

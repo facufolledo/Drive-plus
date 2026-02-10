@@ -157,7 +157,7 @@ class NotificationService:
                 return {"success": False, "error": "Usuario no encontrado"}
             
             if not hasattr(usuario, 'fcm_token') or not usuario.fcm_token:
-                print(f"Usuario {user_id} no tiene token FCM configurado")
+# DEBUG: print(f"Usuario {user_id} no tiene token FCM configurado")
                 return {"success": False, "error": "Usuario sin token FCM"}
             
             # Convertir data a strings (FCM requiere strings)
@@ -176,7 +176,7 @@ class NotificationService:
             )
             
             response = messaging.send(message)
-            print(f"Notificación enviada a usuario {user_id}: {response}")
+# DEBUG: print(f"Notificación enviada a usuario {user_id}: {response}")
             
             return {
                 "success": True,
