@@ -270,6 +270,17 @@ export default function Rankings() {
                   const partidosGanados = jugador.partidos_ganados || 0;
                   const porcentaje = partidosJugados > 0 ? Math.round((partidosGanados / partidosJugados) * 100) : 0;
                   
+                  // DEBUG: Log para verificar datos
+                  if (index === 0 && partidosJugados > 0) {
+                    console.log('DEBUG Rankings - Primer jugador con partidos:', {
+                      nombre: jugador.nombre_usuario,
+                      partidos_jugados: jugador.partidos_jugados,
+                      partidos_ganados: jugador.partidos_ganados,
+                      tendencia: jugador.tendencia,
+                      jugador_completo: jugador
+                    });
+                  }
+                  
                   return (
                     <motion.tr
                       key={jugador.id_usuario || jugador.id}
@@ -399,6 +410,16 @@ export default function Rankings() {
               const partidosJugados = jugador.partidos_jugados || 0;
               const partidosGanados = jugador.partidos_ganados || 0;
               const porcentaje = partidosJugados > 0 ? Math.round((partidosGanados / partidosJugados) * 100) : 0;
+              
+              // DEBUG: Log para verificar datos (móvil)
+              if (index === 0 && partidosJugados > 0) {
+                console.log('DEBUG Rankings Mobile - Primer jugador con partidos:', {
+                  nombre: jugador.nombre_usuario,
+                  partidos_jugados: jugador.partidos_jugados,
+                  partidos_ganados: jugador.partidos_ganados,
+                  tendencia: jugador.tendencia
+                });
+              }
               
               return (
                 <motion.div
