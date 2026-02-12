@@ -70,6 +70,33 @@ export default function EditarPerfil() {
     fileInputRef.current?.click();
   };
 
+  // Comprimir imagen antes de subir
+  const compressImage = (file: File, maxWidth = 800, quality = 0.8): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let { width, height } = img;
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width;
+          width = maxWidth;
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return reject(new Error('No canvas context'));
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => blob ? resolve(blob) : reject(new Error('Error al comprimir')),
+          'image/jpeg',
+          quality
+        );
+      };
+      img.onerror = () => reject(new Error('Error al cargar imagen'));
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -90,16 +117,25 @@ export default function EditarPerfil() {
       setUploadingPhoto(true);
       setError('');
 
+      // Comprimir imagen
+      const compressedBlob = await compressImage(file);
+
       // Crear preview local
       const reader = new FileReader();
       reader.onloadend = () => {
         setPhotoPreview(reader.result as string);
       };
-      reader.readAsDataURL(file);
+      reader.readAsDataURL(compressedBlob);
 
-      // Subir a Firebase Storage
+      // Subir a Firebase Storage con timeout
       const storageRef = ref(storage, `profile-photos/${usuario?.id_usuario}_${Date.now()}`);
-      await uploadBytes(storageRef, file);
+      
+      const uploadPromise = uploadBytes(storageRef, compressedBlob);
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('TIMEOUT')), 30000)
+      );
+
+      await Promise.race([uploadPromise, timeoutPromise]);
       const photoURL = await getDownloadURL(storageRef);
 
       // Actualizar en el backend
@@ -115,7 +151,13 @@ export default function EditarPerfil() {
 
     } catch (error: any) {
       console.error('Error al subir foto:', error);
-      setError('Error al subir la foto. Intenta nuevamente');
+      if (error?.message === 'TIMEOUT') {
+        setError('La subida tardó demasiado. Verificá tu conexión o las reglas de Firebase Storage.');
+      } else if (error?.code === 'storage/unauthorized') {
+        setError('No tenés permisos para subir fotos. Contactá al administrador.');
+      } else {
+        setError(`Error al subir la foto: ${error?.message || 'Intenta nuevamente'}`);
+      }
       setPhotoPreview(usuario?.foto_perfil || null);
     } finally {
       setUploadingPhoto(false);
