@@ -99,6 +99,9 @@ class Torneo(Base):
     # Horarios disponibles del torneo
     horarios_disponibles = Column(JSON, nullable=True, comment="Horarios en los que se pueden programar partidos")
     
+    # Código de circuito (ej: "zf" para Zona Fitness)
+    codigo = Column(String(20), nullable=True, comment="Código de circuito para ranking por torneo")
+    
     created_at = Column(DateTime, server_default=func.current_timestamp())
     updated_at = Column(DateTime, server_default=func.current_timestamp(), onupdate=func.current_timestamp())
     
@@ -114,6 +117,7 @@ class Torneo(Base):
         Index('idx_torneos_fecha_inicio', 'fecha_inicio'),
         Index('idx_torneos_categoria', 'categoria'),
         Index('idx_torneos_requiere_pago', 'requiere_pago'),
+        Index('idx_torneos_codigo', 'codigo'),
     )
 
 
@@ -335,6 +339,26 @@ class TorneoHistorialCambios(Base):
     # Relationships - Comentados temporalmente
     # torneo = relationship("Torneo")
     # usuario = relationship("Usuario")
+
+
+class Circuito(Base):
+    """Circuitos de torneos para ranking acumulado"""
+    __tablename__ = "circuitos"
+    
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    codigo = Column(String(20), unique=True, nullable=False, comment="Código corto del circuito (ej: zf)")
+    nombre = Column(String(100), nullable=False, comment="Nombre del circuito (ej: Zona Fitness)")
+    descripcion = Column(Text, nullable=True)
+    logo_url = Column(Text, nullable=True)
+    activo = Column(Boolean, default=True)
+    creado_por = Column(BigInteger, ForeignKey("usuarios.id_usuario"), nullable=True)
+    created_at = Column(DateTime, server_default=func.current_timestamp())
+    updated_at = Column(DateTime, server_default=func.current_timestamp(), onupdate=func.current_timestamp())
+    
+    __table_args__ = (
+        Index('idx_circuitos_codigo', 'codigo'),
+        Index('idx_circuitos_activo', 'activo'),
+    )
 
 
 class TorneoPagoHistorial(Base):

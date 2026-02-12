@@ -302,6 +302,8 @@ def listar_torneos(
                 "telefono_contacto": torneo.telefono_contacto,
                 # Horarios
                 "horarios_disponibles": torneo.horarios_disponibles,
+                # Código de circuito
+                "codigo": torneo.codigo,
             })
         
         return resultado
@@ -428,6 +430,8 @@ async def obtener_torneo(
         "titular_cuenta": torneo.titular_cuenta,
         "banco": torneo.banco,
         "telefono_contacto": torneo.telefono_contacto,
+        # Código de circuito
+        "codigo": torneo.codigo,
     }
 
 

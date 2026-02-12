@@ -29,6 +29,8 @@ export interface TorneoCreate {
   telefono_contacto?: string;
   // Horarios
   horarios_disponibles?: any;
+  // Código de circuito
+  codigo?: string;
 }
 
 // Tipo del backend

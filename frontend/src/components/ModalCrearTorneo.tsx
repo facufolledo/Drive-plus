@@ -33,6 +33,7 @@ export default function ModalCrearTorneo({ isOpen, onClose }: ModalCrearTorneoPr
     titular: '',
     banco: '',
     telefono: '',
+    codigo: '', // Código de circuito
   });
 
   // Horarios disponibles del torneo
@@ -144,6 +145,7 @@ export default function ModalCrearTorneo({ isOpen, onClose }: ModalCrearTorneoPr
         banco: formData.requierePago && formData.banco ? formData.banco.trim() : undefined,
         telefono_contacto: formData.requierePago && formData.telefono ? formData.telefono.trim() : undefined,
         horarios_disponibles: horariosDisponibles,
+        codigo: formData.codigo?.trim() || undefined,
         reglas_json: {
           puntos_victoria: 3,
           puntos_derrota: 0,
@@ -187,6 +189,7 @@ export default function ModalCrearTorneo({ isOpen, onClose }: ModalCrearTorneoPr
         titular: '',
         banco: '',
         telefono: '',
+        codigo: '',
       });
       setGeneroMasculino(true);
       setGeneroFemenino(false);
@@ -310,6 +313,21 @@ export default function ModalCrearTorneo({ isOpen, onClose }: ModalCrearTorneoPr
                         onChange={(e) => setFormData({ ...formData, lugar: e.target.value })}
                         placeholder="Ej: Club Central"
                       />
+                    </div>
+
+                    {/* Código de circuito */}
+                    <div>
+                      <label className="block text-textSecondary text-xs font-bold mb-1">
+                        <Trophy size={12} className="inline mr-1" />Código de Circuito (Opcional)
+                      </label>
+                      <Input
+                        value={formData.codigo}
+                        onChange={(e) => setFormData({ ...formData, codigo: e.target.value.toLowerCase().replace(/\s/g, '') })}
+                        placeholder="Ej: zf (Zona Fitness)"
+                      />
+                      <p className="text-[10px] text-textSecondary mt-0.5">
+                        Torneos con el mismo código comparten ranking acumulado
+                      </p>
                     </div>
 
                     {/* Canchas disponibles */}

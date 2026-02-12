@@ -83,7 +83,21 @@ class TorneoCreate(BaseModel):
         "puntos_derrota": 0,
         "sets_para_ganar": 2
     })
-    
+
+    # Campos de pago
+    requiere_pago: Optional[bool] = Field(default=False)
+    monto_inscripcion: Optional[float] = Field(default=0)
+    alias_cbu_cvu: Optional[str] = None
+    titular_cuenta: Optional[str] = None
+    banco: Optional[str] = None
+    telefono_contacto: Optional[str] = Field(None, description="Telefono para enviar comprobante de pago")
+
+    # Horarios disponibles del torneo
+    horarios_disponibles: Optional[Any] = Field(default_factory=list, description="Horarios disponibles")
+
+    # Codigo de circuito
+    codigo: Optional[str] = Field(None, max_length=20, description="Codigo de circuito")
+
     @validator('fecha_fin')
     def validar_fechas(cls, v, values):
         if 'fecha_inicio' in values and v < values['fecha_inicio']:
@@ -117,8 +131,22 @@ class TorneoResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     parejas_inscritas: Optional[int] = 0
+
+    # Campos de pago
+    requiere_pago: Optional[bool] = False
+    monto_inscripcion: Optional[float] = 0
+    alias_cbu_cvu: Optional[str] = None
+    titular_cuenta: Optional[str] = None
+    banco: Optional[str] = None
+    telefono_contacto: Optional[str] = None
+
+    # Horarios
+    horarios_disponibles: Optional[Any] = None
     total_partidos: Optional[int] = 0
-    
+
+    # Codigo de circuito
+    codigo: Optional[str] = None
+
     class Config:
         from_attributes = True
 

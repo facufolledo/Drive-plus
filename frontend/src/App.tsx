@@ -33,6 +33,7 @@ const CompletarPerfil = lazy(() => import('./pages/CompletarPerfil'));
 const PerfilPublico = lazy(() => import('./pages/PerfilPublico'));
 const BuscarJugadores = lazy(() => import('./pages/BuscarJugadores'));
 const AdminPanel = lazy(() => import('./pages/AdminPanel'));
+const RankingCircuito = lazy(() => import('./pages/RankingCircuito'));
 const DebugAuth = lazy(() => import('./pages/DebugAuth'));
 
 // Loading component
@@ -69,6 +70,13 @@ function App() {
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/cors-debug" element={<CorsDebugPage />} />
               <Route path="/debug-auth" element={<DebugAuth />} />
+              
+              {/* Ruta pública de ranking de circuito (para compartir en redes) */}
+              <Route path="/circuito/:codigo" element={
+                <div className="min-h-screen bg-background p-4 md:p-8">
+                  <RankingCircuito />
+                </div>
+              } />
               
               {/* Ruta semi-protegida: requiere Firebase auth pero no usuario completo */}
               <Route
@@ -167,6 +175,16 @@ function App() {
                   <PrivateRoute>
                     <Layout>
                       <MiRanking />
+                    </Layout>
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/rankings/circuito"
+                element={
+                  <PrivateRoute>
+                    <Layout>
+                      <RankingCircuito />
                     </Layout>
                   </PrivateRoute>
                 }

@@ -124,7 +124,9 @@ class TorneoService:
             banco=getattr(torneo_data, 'banco', None),
             telefono_contacto=getattr(torneo_data, 'telefono_contacto', None),
             # Horarios disponibles procesados
-            horarios_disponibles=horarios_procesados
+            horarios_disponibles=horarios_procesados,
+            # Código de circuito
+            codigo=getattr(torneo_data, 'codigo', None)
         )
         
         db.add(torneo)

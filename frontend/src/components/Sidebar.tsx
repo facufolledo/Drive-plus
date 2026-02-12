@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, Trophy, BarChart3, X, Gamepad2, Target, Award, User, Shield, Search } from 'lucide-react';
+import { Home, Trophy, BarChart3, X, Gamepad2, Target, Award, User, Shield, Search, Zap } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 interface SidebarProps {
@@ -37,6 +37,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       title: 'Rankings',
       items: [
         { icon: Target, label: 'Tabla General', path: '/rankings' },
+        { icon: Zap, label: 'Ranking por Torneo', path: '/rankings/circuito' },
         { icon: BarChart3, label: 'Tops', path: '/rankings/categorias' },
         { icon: Search, label: 'Buscar Jugadores', path: '/jugadores' },
       ]
