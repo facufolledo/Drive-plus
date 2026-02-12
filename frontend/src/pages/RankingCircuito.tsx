@@ -1,13 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy, Medal, Filter, Search, Plus, Trash2, Loader2, ArrowLeft, Image, ChevronRight } from 'lucide-react';
+import { Trophy, Medal, Filter, Search, Plus, Trash2, Loader2, ArrowLeft, Image, ChevronRight, Upload } from 'lucide-react';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import Input from '../components/Input';
 import { useAuth } from '../context/AuthContext';
 import { useDebounce } from '../hooks/useDebounce';
 import circuitoService, { Circuito, RankingCircuitoItem, CircuitoInfo } from '../services/circuito.service';
+import { storage } from '../config/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const CATEGORIAS_FILTRO = ['Todas', 'Principiante', '8va', '7ma', '6ta', '5ta', '4ta', 'Libre'];
 
@@ -54,6 +56,9 @@ export default function RankingCircuito() {
   const [showCrear, setShowCrear] = useState(false);
   const [nuevoCircuito, setNuevoCircuito] = useState({ codigo: '', nombre: '', descripcion: '', logo_url: '' });
   const [creando, setCreando] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   const debouncedBusqueda = useDebounce(busqueda, 300);
 
@@ -115,6 +120,7 @@ export default function RankingCircuito() {
       });
       setShowCrear(false);
       setNuevoCircuito({ codigo: '', nombre: '', descripcion: '', logo_url: '' });
+      setLogoPreview(null);
       await cargarCircuitos();
     } catch (err: any) {
       alert(err.response?.data?.detail || 'Error al crear circuito');
@@ -131,6 +137,28 @@ export default function RankingCircuito() {
       await cargarCircuitos();
     } catch (err: any) {
       alert(err.response?.data?.detail || 'Error al eliminar');
+    }
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { alert('La imagen no puede superar 5MB'); return; }
+    if (!file.type.startsWith('image/')) { alert('Solo se permiten imágenes'); return; }
+    try {
+      setUploadingLogo(true);
+      const reader = new FileReader();
+      reader.onloadend = () => setLogoPreview(reader.result as string);
+      reader.readAsDataURL(file);
+      const storageRef = ref(storage, `circuitos/${nuevoCircuito.codigo || 'temp'}_${Date.now()}`);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      setNuevoCircuito(prev => ({ ...prev, logo_url: url }));
+    } catch (err) {
+      console.error('Error subiendo logo:', err);
+      alert('Error al subir la imagen');
+    } finally {
+      setUploadingLogo(false);
     }
   };
 
@@ -468,10 +496,22 @@ export default function RankingCircuito() {
                 </div>
                 <div>
                   <label className="block text-textSecondary text-xs font-bold mb-1">
-                    <Image size={12} className="inline mr-1" />URL de imagen/logo (opcional)
+                    <Image size={12} className="inline mr-1" />Imagen del circuito (opcional)
                   </label>
-                  <Input value={nuevoCircuito.logo_url} onChange={(e) => setNuevoCircuito({ ...nuevoCircuito, logo_url: e.target.value })} placeholder="https://ejemplo.com/logo.jpg" />
-                  <p className="text-[10px] text-textSecondary mt-0.5">Se usa como fondo de la card del circuito</p>
+                  <input type="file" ref={logoInputRef} accept="image/*" onChange={handleLogoUpload} className="hidden" />
+                  {logoPreview || nuevoCircuito.logo_url ? (
+                    <div className="relative rounded-lg overflow-hidden h-28 mb-2">
+                      <img src={logoPreview || nuevoCircuito.logo_url} alt="Preview" className="w-full h-full object-cover" />
+                      <button type="button" onClick={() => { setLogoPreview(null); setNuevoCircuito(prev => ({ ...prev, logo_url: '' })); }} className="absolute top-1 right-1 bg-red-500/80 text-white rounded-full p-1 hover:bg-red-500">
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  ) : null}
+                  <button type="button" onClick={() => logoInputRef.current?.click()} disabled={uploadingLogo}
+                    className="w-full py-2 px-3 border border-dashed border-cardBorder rounded-lg text-xs text-textSecondary hover:border-primary hover:text-primary transition-colors flex items-center justify-center gap-2">
+                    {uploadingLogo ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                    {uploadingLogo ? 'Subiendo...' : 'Subir imagen'}
+                  </button>
                 </div>
                 <div className="flex gap-2 pt-2">
                   <Button variant="secondary" onClick={() => setShowCrear(false)} className="flex-1">Cancelar</Button>
