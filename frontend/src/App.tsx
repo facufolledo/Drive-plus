@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Layout from './components/Layout';
 import PrivateRoute from './components/PrivateRoute';
 import ErrorBoundary from './components/ErrorBoundary';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { SalasProvider } from './context/SalasContext';
 import { TorneosProvider } from './context/TorneosContext';
 import { PWAInstallBanner } from './components/PWAInstallBanner';
@@ -49,6 +49,27 @@ const PageLoader = () => (
 // La Landing siempre es accesible, incluso si estás autenticado
 // El usuario decide cuándo entrar a la app
 
+// Wrapper para /circuito/:codigo - muestra con Layout si está logueado, minimal si no
+function CircuitoPublicWrapper() {
+  const { isAuthenticated, isLoading } = useAuth();
+  
+  if (isLoading) return <PageLoader />;
+  
+  if (isAuthenticated) {
+    return (
+      <Layout>
+        <RankingCircuito />
+      </Layout>
+    );
+  }
+  
+  return (
+    <div className="min-h-screen bg-background p-4 md:p-8">
+      <RankingCircuito />
+    </div>
+  );
+}
+
 function App() {
   // Configuración para drive-plus.com.ar
   const basename = import.meta.env.PROD ? '/' : '/';
@@ -72,11 +93,8 @@ function App() {
               <Route path="/debug-auth" element={<DebugAuth />} />
               
               {/* Ruta pública de ranking de circuito (para compartir en redes) */}
-              <Route path="/circuito/:codigo" element={
-                <div className="min-h-screen bg-background p-4 md:p-8">
-                  <RankingCircuito />
-                </div>
-              } />
+              {/* Si está logueado muestra con Layout completo, si no muestra versión minimal */}
+              <Route path="/circuito/:codigo" element={<CircuitoPublicWrapper />} />
               
               {/* Ruta semi-protegida: requiere Firebase auth pero no usuario completo */}
               <Route
