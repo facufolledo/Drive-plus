@@ -292,7 +292,16 @@ def listar_torneos(
                 "fecha_fin": torneo.fecha_fin.isoformat() if torneo.fecha_fin else None,
                 "lugar": torneo.lugar,
                 "created_at": torneo.created_at.isoformat() if torneo.created_at else None,
-                "parejas_inscritas": parejas_count  # ✅ Ahora calcula correctamente
+                "parejas_inscritas": parejas_count,
+                # Campos de pago
+                "requiere_pago": torneo.requiere_pago or False,
+                "monto_inscripcion": float(torneo.monto_inscripcion) if torneo.monto_inscripcion else 0,
+                "alias_cbu_cvu": torneo.alias_cbu_cvu,
+                "titular_cuenta": torneo.titular_cuenta,
+                "banco": torneo.banco,
+                "telefono_contacto": torneo.telefono_contacto,
+                # Horarios
+                "horarios_disponibles": torneo.horarios_disponibles,
             })
         
         return resultado
@@ -411,7 +420,14 @@ async def obtener_torneo(
         "updated_at": torneo.updated_at.isoformat() if torneo.updated_at else None,
         "parejas_inscritas": parejas_count,
         "total_partidos": 0,
-        "es_organizador": es_organizador
+        "es_organizador": es_organizador,
+        # Campos de pago
+        "requiere_pago": torneo.requiere_pago or False,
+        "monto_inscripcion": float(torneo.monto_inscripcion) if torneo.monto_inscripcion else 0,
+        "alias_cbu_cvu": torneo.alias_cbu_cvu,
+        "titular_cuenta": torneo.titular_cuenta,
+        "banco": torneo.banco,
+        "telefono_contacto": torneo.telefono_contacto,
     }
 
 

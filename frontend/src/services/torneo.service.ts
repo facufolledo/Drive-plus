@@ -20,6 +20,15 @@ export interface TorneoCreate {
   max_parejas?: number;
   premio?: string;
   reglas_json?: any;
+  // Campos de pago
+  requiere_pago?: boolean;
+  monto_inscripcion?: number;
+  alias_cbu_cvu?: string;
+  titular_cuenta?: string;
+  banco?: string;
+  telefono_contacto?: string;
+  // Horarios
+  horarios_disponibles?: any;
 }
 
 // Tipo del backend
