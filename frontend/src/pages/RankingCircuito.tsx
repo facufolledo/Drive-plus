@@ -267,8 +267,14 @@ export default function RankingCircuito() {
                           </div>
                         </td>
                         <td className="py-4 px-4">
-                          <button onClick={() => !isPublicRoute && (j.nombre_usuario ? navigate(`/jugador/${j.nombre_usuario}`) : navigate(`/perfil/${j.id_usuario}`))} className={`text-left ${!isPublicRoute ? 'hover:opacity-80 cursor-pointer' : 'cursor-default'}`}>
-                            <p className={`text-textPrimary font-bold text-base ${!isPublicRoute ? 'hover:text-primary' : ''} transition-colors`}>{nombreCompleto}</p>
+                          <button onClick={() => {
+                            if (isPublicRoute) {
+                              navigate('/login');
+                            } else {
+                              j.nombre_usuario ? navigate(`/jugador/${j.nombre_usuario}`) : navigate(`/perfil/${j.id_usuario}`);
+                            }
+                          }} className="text-left hover:opacity-80 cursor-pointer">
+                            <p className="text-textPrimary font-bold text-base hover:text-primary transition-colors">{nombreCompleto}</p>
                             <p className="text-textSecondary text-xs">@{j.nombre_usuario || 'sin-usuario'}</p>
                           </button>
                         </td>
@@ -301,8 +307,14 @@ export default function RankingCircuito() {
                 const nombreCompleto = `${j.nombre || ''} ${j.apellido || ''}`.trim() || j.nombre_usuario || 'Sin nombre';
                 return (
                   <motion.div key={`${j.id_usuario}-${j.categoria}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.04 }}
-                    onClick={() => !isPublicRoute && (j.nombre_usuario ? navigate(`/jugador/${j.nombre_usuario}`) : navigate(`/perfil/${j.id_usuario}`))}
-                    className={`bg-cardBg/50 rounded-lg p-2 border border-cardBorder hover:border-primary/30 transition-colors ${!isPublicRoute ? 'cursor-pointer' : ''}`}>
+                    onClick={() => {
+                      if (isPublicRoute) {
+                        navigate('/login');
+                      } else {
+                        j.nombre_usuario ? navigate(`/jugador/${j.nombre_usuario}`) : navigate(`/perfil/${j.id_usuario}`);
+                      }
+                    }}
+                    className="bg-cardBg/50 rounded-lg p-2 border border-cardBorder hover:border-primary/30 transition-colors cursor-pointer">
                     <div className="flex items-center gap-2 mb-1.5">
                       <div className="flex items-center gap-1 flex-shrink-0">
                         {index === 0 && <Medal className="text-accent" size={14} />}
