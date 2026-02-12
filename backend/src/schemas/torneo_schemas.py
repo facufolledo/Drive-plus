@@ -2,7 +2,7 @@
 Schemas Pydantic para el sistema de torneos
 """
 from pydantic import BaseModel, Field, validator
-from typing import Optional, List
+from typing import Optional, List, Any
 from datetime import date, datetime, time
 from enum import Enum
 
