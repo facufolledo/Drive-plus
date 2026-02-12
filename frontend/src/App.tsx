@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import PrivateRoute from './components/PrivateRoute';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -52,6 +52,7 @@ const PageLoader = () => (
 // Wrapper para /circuito/:codigo - muestra con Layout si está logueado, minimal si no
 function CircuitoPublicWrapper() {
   const { isAuthenticated, isLoading } = useAuth();
+  const navigate = useNavigate();
   
   if (isLoading) return <PageLoader />;
   
@@ -64,8 +65,27 @@ function CircuitoPublicWrapper() {
   }
   
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8">
-      <RankingCircuito />
+    <div className="min-h-screen bg-background">
+      {/* Navbar pública */}
+      <nav className="fixed top-0 left-0 right-0 h-16 bg-cardBg/95 backdrop-blur-xl border-b border-cardBorder z-30 px-4 lg:px-6">
+        <div className="flex items-center justify-between h-full max-w-7xl mx-auto">
+          <button onClick={() => navigate('/')} className="flex items-center hover:opacity-80 transition-opacity cursor-pointer">
+            <img src={`${import.meta.env.BASE_URL}logo-drive.png`} alt="Drive+ Logo" className="h-14 w-auto object-contain" />
+          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => navigate('/login')} className="px-4 py-2 text-sm font-bold text-textSecondary hover:text-textPrimary transition-colors">
+              Iniciar Sesión
+            </button>
+            <button onClick={() => navigate('/register')} className="px-4 py-2 text-sm font-bold bg-primary hover:bg-primary/90 text-white rounded-lg transition-colors">
+              Registrarse
+            </button>
+          </div>
+        </div>
+      </nav>
+      {/* Contenido con padding-top para la navbar */}
+      <div className="pt-20 px-4 md:px-8 pb-8 max-w-7xl mx-auto">
+        <RankingCircuito />
+      </div>
     </div>
   );
 }
