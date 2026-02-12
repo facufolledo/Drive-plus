@@ -59,6 +59,8 @@ export default function RankingCircuito() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const editLogoInputRef = useRef<HTMLInputElement>(null);
+  const [editingCircuitoId, setEditingCircuitoId] = useState<number | null>(null);
 
   const debouncedBusqueda = useDebounce(busqueda, 300);
 
@@ -162,6 +164,36 @@ export default function RankingCircuito() {
     }
   };
 
+  const handleEditLogoClick = (e: React.MouseEvent, circuitoId: number) => {
+    e.stopPropagation();
+    setEditingCircuitoId(circuitoId);
+    editLogoInputRef.current?.click();
+  };
+
+  const handleEditLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !editingCircuitoId) return;
+    if (file.size > 5 * 1024 * 1024) { alert('La imagen no puede superar 5MB'); return; }
+    if (!file.type.startsWith('image/')) { alert('Solo se permiten imágenes'); return; }
+    try {
+      setUploadingLogo(true);
+      const storageRef = ref(storage, `circuitos/${editingCircuitoId}_${Date.now()}`);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      await circuitoService.actualizarCircuito(editingCircuitoId, { logo_url: url });
+      await cargarCircuitos();
+      // Si estamos viendo el ranking de este circuito, recargar info
+      if (codigoParam) await cargarInfoCircuito(codigoParam);
+    } catch (err) {
+      console.error('Error subiendo logo:', err);
+      alert('Error al subir la imagen');
+    } finally {
+      setUploadingLogo(false);
+      setEditingCircuitoId(null);
+      if (editLogoInputRef.current) editLogoInputRef.current.value = '';
+    }
+  };
+
   const verRanking = (codigo: string) => {
     setSearchParams({ c: codigo });
   };
@@ -194,6 +226,9 @@ export default function RankingCircuito() {
   if (codigoParam) {
     return (
       <div className="space-y-6">
+        {/* Input oculto para editar logo */}
+        <input type="file" ref={editLogoInputRef} accept="image/*" onChange={handleEditLogoUpload} className="hidden" />
+        
         {/* Header con botón volver */}
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
           {!isPublicRoute && (
@@ -209,6 +244,16 @@ export default function RankingCircuito() {
                 <div className="absolute inset-0">
                   <img src={circuitoInfo.logo_url} alt="" className="w-full h-full object-cover opacity-20" />
                 </div>
+              )}
+              {/* Admin: botón editar imagen del banner */}
+              {usuario?.es_administrador && (
+                <button
+                  onClick={() => { setEditingCircuitoId(circuitoInfo.id); editLogoInputRef.current?.click(); }}
+                  className="absolute top-3 right-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white rounded-lg px-2.5 py-1.5 text-xs font-bold flex items-center gap-1.5 transition-colors z-10"
+                >
+                  {uploadingLogo && editingCircuitoId === circuitoInfo.id ? <Loader2 size={12} className="animate-spin" /> : <Image size={12} />}
+                  {circuitoInfo.logo_url ? 'Cambiar imagen' : 'Agregar imagen'}
+                </button>
               )}
               <div className="relative p-4 md:p-6">
                 <div className="flex items-center justify-between">
@@ -395,6 +440,9 @@ export default function RankingCircuito() {
         </div>
       </motion.div>
 
+      {/* Input oculto para editar logo de circuito existente */}
+      <input type="file" ref={editLogoInputRef} accept="image/*" onChange={handleEditLogoUpload} className="hidden" />
+
       {/* Grid de circuitos */}
       {circuitos.length === 0 ? (
         <Card>
@@ -439,14 +487,22 @@ export default function RankingCircuito() {
                         <Trophy className="text-white/40 flex-shrink-0" size={24} />
                       </div>
                     </div>
-                    {/* Admin delete button */}
+                    {/* Admin buttons */}
                     {usuario?.es_administrador && (
-                      <button
-                        onClick={(e) => handleEliminarCircuito(e, c.id)}
-                        className="absolute top-2 right-2 bg-red-500/80 hover:bg-red-500 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <Trash2 size={12} />
-                      </button>
+                      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={(e) => handleEditLogoClick(e, c.id)}
+                          className="bg-primary/80 hover:bg-primary text-white rounded-full p-1.5"
+                        >
+                          {uploadingLogo && editingCircuitoId === c.id ? <Loader2 size={12} className="animate-spin" /> : <Image size={12} />}
+                        </button>
+                        <button
+                          onClick={(e) => handleEliminarCircuito(e, c.id)}
+                          className="bg-red-500/80 hover:bg-red-500 text-white rounded-full p-1.5"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
                     )}
                   </div>
 
