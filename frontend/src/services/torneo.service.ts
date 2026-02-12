@@ -744,6 +744,28 @@ class TorneoService {
     return errores;
   }
 
+  // Organizadores
+  async listarOrganizadores(torneoId: number): Promise<any[]> {
+    const response = await axios.get(`${API_URL}/torneos/${torneoId}/organizadores`);
+    return response.data;
+  }
+
+  async agregarOrganizador(torneoId: number, data: { user_id?: number; username?: string }): Promise<any> {
+    const response = await axios.post(
+      `${API_URL}/torneos/${torneoId}/organizadores`,
+      data,
+      this.getAuthHeaders()
+    );
+    return response.data;
+  }
+
+  async removerOrganizador(torneoId: number, userId: number): Promise<void> {
+    await axios.delete(
+      `${API_URL}/torneos/${torneoId}/organizadores/${userId}`,
+      this.getAuthHeaders()
+    );
+  }
+
   // Categorías del sistema (de la tabla categorias)
   async obtenerCategoriasDelSistema(): Promise<{ id: number; nombre: string; sexo: string }[]> {
     const response = await axios.get(`${API_URL}/categorias`);

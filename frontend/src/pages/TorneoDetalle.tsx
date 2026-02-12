@@ -14,6 +14,7 @@ import TorneoPlayoffs from '../components/TorneoPlayoffs';
 import TorneoProgramacion from '../components/TorneoProgramacion';
 import TorneoParejas from '../components/TorneoParejas';
 import TorneoCategorias from '../components/TorneoCategorias';
+import GestionOrganizadores from '../components/GestionOrganizadores';
 
 export default function TorneoDetalle() {
   const { id } = useParams<{ id: string }>();
@@ -22,6 +23,7 @@ export default function TorneoDetalle() {
   const { usuario } = useAuth();
   const [tab, setTab] = useState<'info' | 'parejas' | 'zonas' | 'partidos' | 'playoffs' | 'programacion'>('info');
   const [modalInscripcionOpen, setModalInscripcionOpen] = useState(false);
+  const [modalOrganizadoresOpen, setModalOrganizadoresOpen] = useState(false);
 
   // Helper para parsear fechas sin problemas de zona horaria
   const parseFechaSinZonaHoraria = (fechaISO: string): Date => {
@@ -119,7 +121,7 @@ export default function TorneoDetalle() {
             </div>
             
             {esOrganizador && (
-              <Button variant="ghost" className="flex items-center gap-2">
+              <Button variant="ghost" className="flex items-center gap-2" onClick={() => setModalOrganizadoresOpen(true)}>
                 <Settings size={18} />
                 Gestionar
               </Button>
@@ -428,6 +430,13 @@ export default function TorneoDetalle() {
         esOrganizador={esOrganizador}
         fechaInicio={torneoActual?.fecha_inicio}
         fechaFin={torneoActual?.fecha_fin}
+      />
+
+      <GestionOrganizadores
+        isOpen={modalOrganizadoresOpen}
+        onClose={() => setModalOrganizadoresOpen(false)}
+        torneoId={parseInt(id!)}
+        esOwner={esCreadorTorneo}
       />
     </div>
   );

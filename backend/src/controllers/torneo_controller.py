@@ -478,24 +478,40 @@ def eliminar_torneo(
 @router.post("/{torneo_id}/organizadores")
 def agregar_organizador(
     torneo_id: int,
-    nuevo_organizador_id: int,
-    rol: str = "colaborador",
+    data: dict,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user)
 ):
     """
-    Agrega un organizador al torneo
+    Agrega un organizador al torneo por user_id o username
     
+    Body: {"user_id": 123} o {"username": "nombre_usuario"}
     Solo el owner puede agregar organizadores
     """
     try:
         user_id = current_user.id_usuario
+        
+        # Resolver el usuario por user_id o username
+        nuevo_organizador_id = data.get("user_id")
+        username = data.get("username")
+        
+        if not nuevo_organizador_id and not username:
+            raise HTTPException(status_code=400, detail="Debe enviar user_id o username")
+        
+        if username and not nuevo_organizador_id:
+            usuario = db.query(Usuario).filter(Usuario.nombre_usuario == username).first()
+            if not usuario:
+                raise HTTPException(status_code=404, detail=f"Usuario '{username}' no encontrado")
+            nuevo_organizador_id = usuario.id_usuario
+        
         organizador = TorneoService.agregar_organizador(
-            db, torneo_id, nuevo_organizador_id, user_id, rol
+            db, torneo_id, nuevo_organizador_id, user_id, data.get("rol", "colaborador")
         )
         return {"message": "Organizador agregado exitosamente", "organizador_id": organizador.id}
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
@@ -528,10 +544,29 @@ def listar_organizadores(
     torneo_id: int,
     db: Session = Depends(get_db)
 ):
-    """Lista todos los organizadores de un torneo"""
+    """Lista todos los organizadores de un torneo con datos del usuario"""
     try:
-        organizadores = TorneoService.listar_organizadores(db, torneo_id)
-        return organizadores
+        from ..models.torneo_models import TorneoOrganizador
+        
+        organizadores = db.query(TorneoOrganizador).filter(
+            TorneoOrganizador.torneo_id == torneo_id
+        ).all()
+        
+        resultado = []
+        for org in organizadores:
+            usuario = db.query(Usuario).filter(Usuario.id_usuario == org.user_id).first()
+            resultado.append({
+                "id": org.id,
+                "user_id": org.user_id,
+                "rol": org.rol.value if hasattr(org.rol, 'value') else str(org.rol),
+                "nombre": usuario.nombre if usuario else "",
+                "apellido": usuario.apellido if usuario else "",
+                "nombre_usuario": usuario.nombre_usuario if usuario else "",
+                "imagen_url": usuario.imagen_url if usuario and hasattr(usuario, 'imagen_url') else None,
+                "created_at": org.created_at.isoformat() if org.created_at else None,
+            })
+        
+        return resultado
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
