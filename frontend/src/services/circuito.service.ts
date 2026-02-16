@@ -21,9 +21,8 @@ export interface RankingCircuitoItem {
   imagen_url?: string;
   categoria?: string;
   puntos: number;
-  partidos_jugados: number;
-  partidos_ganados: number;
-  winrate: number;
+  fase_alcanzada?: string;
+  torneos_jugados: number;
 }
 
 export interface CircuitoInfo extends Circuito {

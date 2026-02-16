@@ -8,7 +8,7 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 from ..database.config import get_db
-from ..models.torneo_models import Circuito, Torneo, TorneoCategoria
+from ..models.torneo_models import Circuito, Torneo, TorneoCategoria, CircuitoPuntosJugador, CircuitoPuntosFase
 from ..models.driveplus_models import Usuario, PerfilUsuario, Categoria, HistorialRating, Partido
 from ..auth.auth_utils import get_current_user
 
@@ -49,9 +49,15 @@ class RankingCircuitoItem(BaseModel):
     imagen_url: Optional[str]
     categoria: Optional[str]
     puntos: float
-    partidos_jugados: int
-    partidos_ganados: int
-    winrate: float
+    fase_alcanzada: Optional[str] = None
+    torneos_jugados: int = 0
+
+class AsignarPuntosRequest(BaseModel):
+    torneo_id: int
+    categoria_id: int
+    usuario_id: int
+    fase_alcanzada: str
+    puntos: Optional[int] = None  # Si no se pasa, se calcula de la config
 
 
 # ============================================
@@ -197,103 +203,184 @@ async def ranking_circuito(
 ):
     """
     Ranking de jugadores en un circuito.
-    Suma los deltas positivos de historial_rating para partidos de torneos con ese código.
-    Usa la categoría del torneo (partidos.categoria_id -> torneo_categorias) no la actual del usuario.
-    Un jugador puede aparecer en múltiples categorías si jugó en distintas.
+    Suma los puntos de circuito_puntos_jugador agrupados por usuario y categoría.
     """
     codigo = codigo.lower()
     
-    # Verificar que el circuito existe
     circuito = db.query(Circuito).filter(Circuito.codigo == codigo).first()
     if not circuito:
         raise HTTPException(status_code=404, detail=f"Circuito '{codigo}' no encontrado")
     
-    # Obtener IDs de torneos con este código
-    torneo_ids = db.query(Torneo.id).filter(Torneo.codigo == codigo).all()
-    torneo_ids = [t[0] for t in torneo_ids]
-    
-    if not torneo_ids:
-        return []
-    
-    # Subquery: puntos por (usuario, categoria_torneo)
-    # Agrupamos por usuario Y por la categoría del partido en el torneo
+    # Subquery: puntos totales por (usuario, categoria)
     puntos_subq = (
         db.query(
-            HistorialRating.id_usuario,
-            Partido.categoria_id.label("cat_id"),
-            func.sum(
-                case(
-                    (HistorialRating.delta > 0, HistorialRating.delta),
-                    else_=0
-                )
-            ).label("puntos"),
-            func.count(func.distinct(HistorialRating.id_partido)).label("partidos_jugados"),
-            func.sum(
-                case(
-                    (HistorialRating.delta > 0, 1),
-                    else_=0
-                )
-            ).label("partidos_ganados")
+            CircuitoPuntosJugador.usuario_id,
+            CircuitoPuntosJugador.categoria_id,
+            func.sum(CircuitoPuntosJugador.puntos).label("total_puntos"),
+            func.count(func.distinct(CircuitoPuntosJugador.torneo_id)).label("torneos_jugados"),
+            # Mejor fase alcanzada (la de mayor puntaje)
+            func.max(CircuitoPuntosJugador.puntos).label("mejor_puntos"),
         )
-        .join(Partido, HistorialRating.id_partido == Partido.id_partido)
-        .filter(
-            Partido.id_torneo.in_(torneo_ids),
-            Partido.estado.in_(["finalizado", "confirmado"]),
-            Partido.categoria_id.isnot(None)
-        )
-        .group_by(HistorialRating.id_usuario, Partido.categoria_id)
+        .filter(CircuitoPuntosJugador.circuito_id == circuito.id)
+        .group_by(CircuitoPuntosJugador.usuario_id, CircuitoPuntosJugador.categoria_id)
         .subquery()
     )
     
-    # Query principal: join con usuario, perfil, y torneo_categorias para el nombre
+    # Query principal
     query = (
         db.query(
-            puntos_subq.c.id_usuario,
+            puntos_subq.c.usuario_id,
             Usuario.nombre_usuario,
             PerfilUsuario.nombre,
             PerfilUsuario.apellido,
             PerfilUsuario.url_avatar,
             TorneoCategoria.nombre.label("categoria_nombre"),
-            puntos_subq.c.puntos,
-            puntos_subq.c.partidos_jugados,
-            puntos_subq.c.partidos_ganados,
+            puntos_subq.c.total_puntos,
+            puntos_subq.c.torneos_jugados,
         )
-        .join(Usuario, Usuario.id_usuario == puntos_subq.c.id_usuario)
+        .join(Usuario, Usuario.id_usuario == puntos_subq.c.usuario_id)
         .join(PerfilUsuario, Usuario.id_usuario == PerfilUsuario.id_usuario, isouter=True)
-        .join(TorneoCategoria, TorneoCategoria.id == puntos_subq.c.cat_id, isouter=True)
+        .join(TorneoCategoria, TorneoCategoria.id == puntos_subq.c.categoria_id, isouter=True)
     )
     
-    # Filtro por categoría del torneo
     if categoria:
         query = query.filter(TorneoCategoria.nombre == categoria)
     
-    # Solo jugadores con puntos > 0
-    query = query.filter(puntos_subq.c.puntos > 0)
+    query = query.filter(puntos_subq.c.total_puntos > 0)
+    jugadores = query.order_by(desc(puntos_subq.c.total_puntos)).limit(limit).all()
     
-    # Ordenar por puntos descendente
-    jugadores = query.order_by(desc(puntos_subq.c.puntos)).limit(limit).all()
+    # Para obtener fase_alcanzada del último torneo, hacemos una query extra solo si hay resultados
+    # Optimización: obtener la fase del registro con mayor puntos para cada usuario/cat
+    fase_map = {}
+    if jugadores:
+        user_cat_pairs = [(j.usuario_id, j.categoria_nombre) for j in jugadores]
+        fases = (
+            db.query(
+                CircuitoPuntosJugador.usuario_id,
+                CircuitoPuntosJugador.categoria_id,
+                CircuitoPuntosJugador.fase_alcanzada,
+                CircuitoPuntosJugador.puntos,
+            )
+            .filter(CircuitoPuntosJugador.circuito_id == circuito.id)
+            .order_by(CircuitoPuntosJugador.puntos.desc())
+            .all()
+        )
+        for f in fases:
+            key = (f.usuario_id, f.categoria_id)
+            if key not in fase_map:
+                fase_map[key] = f.fase_alcanzada
     
     result = []
     for i, j in enumerate(jugadores):
-        partidos = j.partidos_jugados or 0
-        ganados = j.partidos_ganados or 0
-        winrate = round((ganados / partidos * 100), 1) if partidos > 0 else 0
+        # Buscar la fase del registro con cat_id
+        cat_id_for_fase = None
+        if j.categoria_nombre:
+            cat_row = db.query(TorneoCategoria.id).filter(TorneoCategoria.nombre == j.categoria_nombre).first()
+            if cat_row:
+                cat_id_for_fase = cat_row[0]
+        
+        fase = fase_map.get((j.usuario_id, cat_id_for_fase)) if cat_id_for_fase else None
         
         result.append(RankingCircuitoItem(
             posicion=i + 1,
-            id_usuario=j.id_usuario,
+            id_usuario=j.usuario_id,
             nombre_usuario=j.nombre_usuario,
             nombre=j.nombre,
             apellido=j.apellido,
             imagen_url=j.url_avatar,
             categoria=j.categoria_nombre,
-            puntos=round(float(j.puntos), 1),
-            partidos_jugados=partidos,
-            partidos_ganados=ganados,
-            winrate=winrate
+            puntos=float(j.total_puntos),
+            fase_alcanzada=fase,
+            torneos_jugados=j.torneos_jugados or 0,
         ))
     
     return result
+
+
+@router.post("/{codigo}/puntos", status_code=201)
+async def asignar_puntos(
+    codigo: str,
+    data: AsignarPuntosRequest,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user)
+):
+    """Asignar o editar puntos de un jugador en un torneo/categoría (solo admin)"""
+    if not current_user.es_administrador:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden asignar puntos")
+    
+    codigo = codigo.lower()
+    circuito = db.query(Circuito).filter(Circuito.codigo == codigo).first()
+    if not circuito:
+        raise HTTPException(status_code=404, detail=f"Circuito '{codigo}' no encontrado")
+    
+    # Si no se pasan puntos, buscar en la config
+    puntos = data.puntos
+    if puntos is None:
+        config = db.query(CircuitoPuntosFase).filter(
+            CircuitoPuntosFase.circuito_id == circuito.id,
+            CircuitoPuntosFase.fase == data.fase_alcanzada
+        ).first()
+        if not config:
+            raise HTTPException(status_code=400, detail=f"Fase '{data.fase_alcanzada}' no configurada para este circuito")
+        puntos = config.puntos
+    
+    from sqlalchemy import text
+    db.execute(text("""
+        INSERT INTO circuito_puntos_jugador (circuito_id, torneo_id, categoria_id, usuario_id, fase_alcanzada, puntos)
+        VALUES (:cir, :tor, :cat, :usr, :fase, :pts)
+        ON CONFLICT (circuito_id, torneo_id, categoria_id, usuario_id)
+        DO UPDATE SET fase_alcanzada = EXCLUDED.fase_alcanzada, puntos = EXCLUDED.puntos
+    """), {"cir": circuito.id, "tor": data.torneo_id, "cat": data.categoria_id, "usr": data.usuario_id, "fase": data.fase_alcanzada, "pts": puntos})
+    db.commit()
+    
+    return {"message": f"Puntos asignados: {puntos} pts ({data.fase_alcanzada}) al usuario {data.usuario_id}"}
+
+
+@router.delete("/{codigo}/puntos")
+async def eliminar_puntos(
+    codigo: str,
+    torneo_id: int = Query(...),
+    categoria_id: int = Query(...),
+    usuario_id: int = Query(...),
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user)
+):
+    """Eliminar puntos de un jugador en un torneo/categoría (solo admin)"""
+    if not current_user.es_administrador:
+        raise HTTPException(status_code=403, detail="Solo administradores")
+    
+    codigo = codigo.lower()
+    circuito = db.query(Circuito).filter(Circuito.codigo == codigo).first()
+    if not circuito:
+        raise HTTPException(status_code=404, detail=f"Circuito '{codigo}' no encontrado")
+    
+    deleted = db.query(CircuitoPuntosJugador).filter(
+        CircuitoPuntosJugador.circuito_id == circuito.id,
+        CircuitoPuntosJugador.torneo_id == torneo_id,
+        CircuitoPuntosJugador.categoria_id == categoria_id,
+        CircuitoPuntosJugador.usuario_id == usuario_id,
+    ).delete()
+    db.commit()
+    
+    return {"message": f"{'Eliminado' if deleted else 'No encontrado'}"}
+
+
+@router.get("/{codigo}/puntos-config")
+async def obtener_config_puntos(
+    codigo: str,
+    db: Session = Depends(get_db)
+):
+    """Obtener la configuración de puntos por fase de un circuito"""
+    codigo = codigo.lower()
+    circuito = db.query(Circuito).filter(Circuito.codigo == codigo).first()
+    if not circuito:
+        raise HTTPException(status_code=404, detail=f"Circuito '{codigo}' no encontrado")
+    
+    config = db.query(CircuitoPuntosFase).filter(
+        CircuitoPuntosFase.circuito_id == circuito.id
+    ).order_by(desc(CircuitoPuntosFase.puntos)).all()
+    
+    return [{"fase": c.fase, "puntos": c.puntos} for c in config]
 
 
 @router.get("/{codigo}/info")

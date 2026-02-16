@@ -361,6 +361,39 @@ class Circuito(Base):
     )
 
 
+class CircuitoPuntosFase(Base):
+    """Configuración de puntos por fase para cada circuito"""
+    __tablename__ = "circuito_puntos_fase"
+    
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    circuito_id = Column(BigInteger, ForeignKey("circuitos.id", ondelete="CASCADE"), nullable=False)
+    fase = Column(String(20), nullable=False)
+    puntos = Column(Integer, nullable=False, default=0)
+    
+    __table_args__ = (
+        Index('idx_circuito_puntos_fase_circuito', 'circuito_id'),
+    )
+
+
+class CircuitoPuntosJugador(Base):
+    """Puntos acumulados por jugador en cada torneo/categoría del circuito"""
+    __tablename__ = "circuito_puntos_jugador"
+    
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    circuito_id = Column(BigInteger, ForeignKey("circuitos.id", ondelete="CASCADE"), nullable=False)
+    torneo_id = Column(BigInteger, ForeignKey("torneos.id", ondelete="CASCADE"), nullable=False)
+    categoria_id = Column(BigInteger, ForeignKey("torneo_categorias.id", ondelete="CASCADE"), nullable=False)
+    usuario_id = Column(BigInteger, ForeignKey("usuarios.id_usuario", ondelete="CASCADE"), nullable=False)
+    fase_alcanzada = Column(String(20), nullable=False)
+    puntos = Column(Integer, nullable=False, default=0)
+    
+    __table_args__ = (
+        Index('idx_circuito_puntos_jugador_circuito', 'circuito_id'),
+        Index('idx_circuito_puntos_jugador_usuario', 'usuario_id'),
+        Index('idx_circuito_puntos_jugador_torneo', 'torneo_id'),
+    )
+
+
 class TorneoPagoHistorial(Base):
     """Historial de cambios de estado de pagos para auditoría"""
     __tablename__ = "torneos_pagos_historial"

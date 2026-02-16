@@ -13,6 +13,26 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const CATEGORIAS_FILTRO = ['Todas', 'Principiante', '8va', '7ma', '6ta', '5ta', '4ta', 'Libre'];
 
+const FASE_LABELS: Record<string, string> = {
+  campeon: '🏆 Campeón',
+  subcampeon: '🥈 Subcampeón',
+  semis: 'Semifinal',
+  cuartos: 'Cuartos',
+  '8vos': 'Octavos',
+  '16avos': '16avos',
+  zona: 'Zona',
+};
+
+const FASE_COLORS: Record<string, string> = {
+  campeon: 'text-yellow-400',
+  subcampeon: 'text-gray-300',
+  semis: 'text-orange-400',
+  cuartos: 'text-blue-400',
+  '8vos': 'text-purple-400',
+  '16avos': 'text-indigo-400',
+  zona: 'text-textSecondary',
+};
+
 // Colores de gradiente para las cards
 const CARD_GRADIENTS = [
   'from-blue-600 to-indigo-800',
@@ -316,16 +336,15 @@ export default function RankingCircuito() {
                   <th className="text-left py-3 px-4 text-textSecondary text-sm font-bold uppercase tracking-wider">Jugador</th>
                   <th className="text-center py-3 px-4 text-textSecondary text-sm font-bold uppercase tracking-wider">Puntos</th>
                   <th className="text-center py-3 px-4 text-textSecondary text-sm font-bold uppercase tracking-wider">Categoría</th>
-                  <th className="text-center py-3 px-4 text-textSecondary text-sm font-bold uppercase tracking-wider">Partidos</th>
-                  <th className="text-center py-3 px-4 text-textSecondary text-sm font-bold uppercase tracking-wider">Victorias</th>
-                  <th className="text-center py-3 px-4 text-textSecondary text-sm font-bold uppercase tracking-wider">% Win</th>
+                  <th className="text-center py-3 px-4 text-textSecondary text-sm font-bold uppercase tracking-wider">Mejor Fase</th>
+                  <th className="text-center py-3 px-4 text-textSecondary text-sm font-bold uppercase tracking-wider">Torneos</th>
                 </tr>
               </thead>
               <tbody>
                 {loadingRanking ? (
-                  <tr><td colSpan={7} className="py-8 text-center text-textSecondary">Cargando ranking...</td></tr>
+                  <tr><td colSpan={6} className="py-8 text-center text-textSecondary">Cargando ranking...</td></tr>
                 ) : rankingFiltrado.length === 0 ? (
-                  <tr><td colSpan={7} className="py-8 text-center text-textSecondary">No hay jugadores en este circuito</td></tr>
+                  <tr><td colSpan={6} className="py-8 text-center text-textSecondary">No hay jugadores en este circuito</td></tr>
                 ) : (
                   rankingFiltrado.map((j, index) => {
                     const nombreCompleto = `${j.nombre || ''} ${j.apellido || ''}`.trim() || j.nombre_usuario || 'Sin nombre';
@@ -355,9 +374,12 @@ export default function RankingCircuito() {
                         <td className="py-4 px-4 text-center">
                           <span className="inline-block px-3 py-1 rounded-full text-white font-bold text-sm bg-gradient-to-r from-blue-500 to-blue-600">{j.categoria || '-'}</span>
                         </td>
-                        <td className="py-4 px-4 text-center text-textPrimary font-semibold">{j.partidos_jugados}</td>
-                        <td className="py-4 px-4 text-center text-secondary font-semibold">{j.partidos_ganados}</td>
-                        <td className="py-4 px-4 text-center text-textPrimary font-semibold">{j.winrate}%</td>
+                        <td className="py-4 px-4 text-center">
+                          <span className={`font-semibold ${FASE_COLORS[j.fase_alcanzada || ''] || 'text-textSecondary'}`}>
+                            {FASE_LABELS[j.fase_alcanzada || ''] || j.fase_alcanzada || '-'}
+                          </span>
+                        </td>
+                        <td className="py-4 px-4 text-center text-textPrimary font-semibold">{j.torneos_jugados}</td>
                       </motion.tr>
                     );
                   })
@@ -405,9 +427,8 @@ export default function RankingCircuito() {
                       </div>
                     </div>
                     <div className="flex items-center justify-between text-[9px] pt-1.5 border-t border-cardBorder/50">
-                      <div className="text-center"><p className="text-textSecondary">Partidos</p><p className="text-textPrimary font-bold text-xs">{j.partidos_jugados}</p></div>
-                      <div className="text-center"><p className="text-textSecondary">Victorias</p><p className="text-secondary font-bold text-xs">{j.partidos_ganados}</p></div>
-                      <div className="text-center"><p className="text-textSecondary">% Win</p><p className="text-accent font-bold text-xs">{j.winrate}%</p></div>
+                      <div className="text-center"><p className="text-textSecondary">Fase</p><p className={`font-bold text-xs ${FASE_COLORS[j.fase_alcanzada || ''] || 'text-textSecondary'}`}>{FASE_LABELS[j.fase_alcanzada || ''] || j.fase_alcanzada || '-'}</p></div>
+                      <div className="text-center"><p className="text-textSecondary">Torneos</p><p className="text-textPrimary font-bold text-xs">{j.torneos_jugados}</p></div>
                     </div>
                   </motion.div>
                 );
