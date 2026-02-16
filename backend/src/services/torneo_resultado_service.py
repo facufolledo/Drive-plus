@@ -175,6 +175,15 @@ class TorneoResultadoService:
                 torneo.estado = 'finalizado'  # String en lugar de Enum
                 db.commit()
                 logger.info(f"Torneo {partido.id_torneo} marcado como finalizado")
+                
+                # Calcular puntos de circuito si el torneo tiene código de circuito
+                if torneo.codigo:
+                    try:
+                        TorneoResultadoService._calcular_puntos_circuito(
+                            db, torneo, partido.categoria_id, ganador_pareja_id
+                        )
+                    except Exception as e:
+                        logger.error(f"Error calculando puntos de circuito: {e}")
             return None
         
         # Determinar siguiente fase
@@ -238,6 +247,87 @@ class TorneoResultadoService:
         
         return partido_siguiente
     
+    @staticmethod
+    def _calcular_puntos_circuito(
+        db: Session,
+        torneo,
+        categoria_id: int,
+        ganador_final_pareja_id: int
+    ):
+        """
+        Calcula y asigna puntos de circuito para todas las parejas de una categoría
+        cuando se confirma la final.
+        """
+        from sqlalchemy import text
+        from ..models.torneo_models import Circuito
+        
+        # Buscar circuito por código del torneo
+        circuito = db.query(Circuito).filter(Circuito.codigo == torneo.codigo).first()
+        if not circuito:
+            logger.warning(f"Circuito '{torneo.codigo}' no encontrado, no se calculan puntos")
+            return
+        
+        # Obtener config de puntos
+        puntos_config = {}
+        rows = db.execute(text(
+            "SELECT fase, puntos FROM circuito_puntos_fase WHERE circuito_id = :cid"
+        ), {"cid": circuito.id}).fetchall()
+        for r in rows:
+            puntos_config[r[0]] = r[1]
+        
+        if not puntos_config:
+            logger.warning(f"No hay config de puntos para circuito {circuito.codigo}")
+            return
+        
+        # Obtener todos los playoffs confirmados de esta categoría
+        playoffs = db.execute(text("""
+            SELECT id_partido, fase, pareja1_id, pareja2_id, ganador_pareja_id
+            FROM partidos
+            WHERE id_torneo = :tid AND categoria_id = :cid 
+            AND fase IS NOT NULL AND fase != 'zona'
+            AND estado = 'confirmado' AND ganador_pareja_id IS NOT NULL
+        """), {"tid": torneo.id, "cid": categoria_id}).fetchall()
+        
+        # Determinar fase alcanzada por cada pareja
+        fase_pareja = {}
+        for _, fase, p1, p2, ganador in playoffs:
+            perdedor = p1 if ganador == p2 else p2
+            fase_map = {'final': ('campeon', 'subcampeon'), 'semis': (None, 'semis'),
+                       '4tos': (None, 'cuartos'), '8vos': (None, '8vos'), '16avos': (None, '16avos')}
+            if fase in fase_map:
+                _, perdedor_fase = fase_map[fase]
+                if fase == 'final':
+                    fase_pareja[ganador] = 'campeon'
+                    fase_pareja[perdedor] = 'subcampeon'
+                elif perdedor not in fase_pareja:
+                    fase_pareja[perdedor] = perdedor_fase
+        
+        # Todas las parejas de esta categoría
+        parejas = db.execute(text("""
+            SELECT id, jugador1_id, jugador2_id FROM torneos_parejas
+            WHERE torneo_id = :tid AND categoria_id = :cid AND estado != 'baja'
+        """), {"tid": torneo.id, "cid": categoria_id}).fetchall()
+        
+        # Insertar puntos
+        count = 0
+        for pareja_id, j1, j2 in parejas:
+            fase = fase_pareja.get(pareja_id, 'zona')
+            pts = puntos_config.get(fase, 0)
+            
+            for jugador_id in [j1, j2]:
+                db.execute(text("""
+                    INSERT INTO circuito_puntos_jugador 
+                    (circuito_id, torneo_id, categoria_id, usuario_id, fase_alcanzada, puntos)
+                    VALUES (:cir, :tor, :cat, :usr, :fase, :pts)
+                    ON CONFLICT (circuito_id, torneo_id, categoria_id, usuario_id)
+                    DO UPDATE SET fase_alcanzada = EXCLUDED.fase_alcanzada, puntos = EXCLUDED.puntos
+                """), {"cir": circuito.id, "tor": torneo.id, "cat": categoria_id,
+                       "usr": jugador_id, "fase": fase, "pts": pts})
+                count += 1
+        
+        db.commit()
+        logger.info(f"Puntos de circuito calculados: {count} registros para torneo {torneo.id}, categoría {categoria_id}")
+
     @staticmethod
     def _verificar_partido_listo(db: Session, partido: Partido) -> None:
         """
