@@ -203,98 +203,64 @@ async def ranking_circuito(
 ):
     """
     Ranking de jugadores en un circuito.
-    Suma los puntos de circuito_puntos_jugador agrupados por usuario y categoría.
+    Una sola query SQL: suma puntos, cuenta torneos, y obtiene mejor fase.
     """
+    from sqlalchemy import text
     codigo = codigo.lower()
     
     circuito = db.query(Circuito).filter(Circuito.codigo == codigo).first()
     if not circuito:
         raise HTTPException(status_code=404, detail=f"Circuito '{codigo}' no encontrado")
     
-    # Subquery: puntos totales por (usuario, categoria)
-    puntos_subq = (
-        db.query(
-            CircuitoPuntosJugador.usuario_id,
-            CircuitoPuntosJugador.categoria_id,
-            func.sum(CircuitoPuntosJugador.puntos).label("total_puntos"),
-            func.count(func.distinct(CircuitoPuntosJugador.torneo_id)).label("torneos_jugados"),
-            # Mejor fase alcanzada (la de mayor puntaje)
-            func.max(CircuitoPuntosJugador.puntos).label("mejor_puntos"),
-        )
-        .filter(CircuitoPuntosJugador.circuito_id == circuito.id)
-        .group_by(CircuitoPuntosJugador.usuario_id, CircuitoPuntosJugador.categoria_id)
-        .subquery()
-    )
-    
-    # Query principal
-    query = (
-        db.query(
-            puntos_subq.c.usuario_id,
-            Usuario.nombre_usuario,
-            PerfilUsuario.nombre,
-            PerfilUsuario.apellido,
-            PerfilUsuario.url_avatar,
-            TorneoCategoria.nombre.label("categoria_nombre"),
-            puntos_subq.c.total_puntos,
-            puntos_subq.c.torneos_jugados,
-        )
-        .join(Usuario, Usuario.id_usuario == puntos_subq.c.usuario_id)
-        .join(PerfilUsuario, Usuario.id_usuario == PerfilUsuario.id_usuario, isouter=True)
-        .join(TorneoCategoria, TorneoCategoria.id == puntos_subq.c.categoria_id, isouter=True)
-    )
-    
+    params = {"cid": circuito.id, "lim": limit}
+    cat_filter = ""
     if categoria:
-        query = query.filter(TorneoCategoria.nombre == categoria)
+        cat_filter = "AND tc.nombre = :cat"
+        params["cat"] = categoria
     
-    query = query.filter(puntos_subq.c.total_puntos > 0)
-    jugadores = query.order_by(desc(puntos_subq.c.total_puntos)).limit(limit).all()
+    sql = f"""
+        SELECT 
+            cpj.usuario_id,
+            u.nombre_usuario,
+            p.nombre,
+            p.apellido,
+            p.url_avatar,
+            tc.nombre as categoria,
+            SUM(cpj.puntos) as total_puntos,
+            COUNT(DISTINCT cpj.torneo_id) as torneos_jugados,
+            (SELECT cpj2.fase_alcanzada FROM circuito_puntos_jugador cpj2 
+             WHERE cpj2.usuario_id = cpj.usuario_id 
+             AND cpj2.categoria_id = cpj.categoria_id 
+             AND cpj2.circuito_id = :cid
+             ORDER BY cpj2.puntos DESC LIMIT 1) as mejor_fase
+        FROM circuito_puntos_jugador cpj
+        JOIN usuarios u ON cpj.usuario_id = u.id_usuario
+        LEFT JOIN perfil_usuarios p ON u.id_usuario = p.id_usuario
+        LEFT JOIN torneo_categorias tc ON cpj.categoria_id = tc.id
+        WHERE cpj.circuito_id = :cid {cat_filter}
+        GROUP BY cpj.usuario_id, cpj.categoria_id, u.nombre_usuario, p.nombre, p.apellido, p.url_avatar, tc.nombre
+        HAVING SUM(cpj.puntos) > 0
+        ORDER BY total_puntos DESC
+        LIMIT :lim
+    """
     
-    # Para obtener fase_alcanzada del último torneo, hacemos una query extra solo si hay resultados
-    # Optimización: obtener la fase del registro con mayor puntos para cada usuario/cat
-    fase_map = {}
-    if jugadores:
-        user_cat_pairs = [(j.usuario_id, j.categoria_nombre) for j in jugadores]
-        fases = (
-            db.query(
-                CircuitoPuntosJugador.usuario_id,
-                CircuitoPuntosJugador.categoria_id,
-                CircuitoPuntosJugador.fase_alcanzada,
-                CircuitoPuntosJugador.puntos,
-            )
-            .filter(CircuitoPuntosJugador.circuito_id == circuito.id)
-            .order_by(CircuitoPuntosJugador.puntos.desc())
-            .all()
-        )
-        for f in fases:
-            key = (f.usuario_id, f.categoria_id)
-            if key not in fase_map:
-                fase_map[key] = f.fase_alcanzada
+    rows = db.execute(text(sql), params).fetchall()
     
-    result = []
-    for i, j in enumerate(jugadores):
-        # Buscar la fase del registro con cat_id
-        cat_id_for_fase = None
-        if j.categoria_nombre:
-            cat_row = db.query(TorneoCategoria.id).filter(TorneoCategoria.nombre == j.categoria_nombre).first()
-            if cat_row:
-                cat_id_for_fase = cat_row[0]
-        
-        fase = fase_map.get((j.usuario_id, cat_id_for_fase)) if cat_id_for_fase else None
-        
-        result.append(RankingCircuitoItem(
+    return [
+        RankingCircuitoItem(
             posicion=i + 1,
-            id_usuario=j.usuario_id,
-            nombre_usuario=j.nombre_usuario,
-            nombre=j.nombre,
-            apellido=j.apellido,
-            imagen_url=j.url_avatar,
-            categoria=j.categoria_nombre,
-            puntos=float(j.total_puntos),
-            fase_alcanzada=fase,
-            torneos_jugados=j.torneos_jugados or 0,
-        ))
-    
-    return result
+            id_usuario=r[0],
+            nombre_usuario=r[1],
+            nombre=r[2],
+            apellido=r[3],
+            imagen_url=r[4],
+            categoria=r[5],
+            puntos=float(r[6]),
+            fase_alcanzada=r[8],
+            torneos_jugados=r[7] or 0,
+        )
+        for i, r in enumerate(rows)
+    ]
 
 
 @router.post("/{codigo}/puntos", status_code=201)
