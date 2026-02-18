@@ -1866,6 +1866,7 @@ def generar_zonas_inteligente(
 
 
 @router.post("/{torneo_id}/generar-fixture")
+@router.post("/{torneo_id}/generar-fixture/")
 def generar_fixture(
     torneo_id: int,
     categoria_id: Optional[int] = Query(None, description="ID de categoría para generar fixture solo de esa categoría"),
