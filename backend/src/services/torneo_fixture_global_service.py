@@ -368,7 +368,7 @@ class TorneoFixtureGlobalService:
             }
             
             if not restricciones_por_dia:
-# DEBUG: print(f"   ⚠️  Después de parsear: SIN restricciones válidas")
+                pass  # Sin restricciones válidas
         
         return resultado
     
