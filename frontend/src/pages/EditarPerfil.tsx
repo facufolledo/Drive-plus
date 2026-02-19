@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Camera, Save, X, MapPin, User, Award, Pencil } from 'lucide-react';
+import { Camera, Save, X, MapPin, User, Award, Pencil, Lock, Eye, EyeOff } from 'lucide-react';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '../config/firebase';
+import { storage, auth as firebaseAuth } from '../config/firebase';
+import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 import { useAuth } from '../context/AuthContext';
 import Button from '../components/Button';
 import Input from '../components/Input';
@@ -22,6 +23,23 @@ export default function EditarPerfil() {
   const [error, setError] = useState('');
   const [photoPreview, setPhotoPreview] = useState<string | null>(
     usuario?.foto_perfil || null
+  );
+
+  // Estado para cambio de contraseña
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
+
+  // Detectar si el usuario se registró con Google (no puede cambiar password)
+  const isGoogleUser = firebaseAuth.currentUser?.providerData?.some(
+    (p) => p.providerId === 'google.com'
   );
 
   const [formData, setFormData] = useState({
@@ -161,6 +179,50 @@ export default function EditarPerfil() {
       setPhotoPreview(usuario?.foto_perfil || null);
     } finally {
       setUploadingPhoto(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    setPasswordError('');
+    setPasswordSuccess('');
+
+    if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+      setPasswordError('Completá todos los campos');
+      return;
+    }
+    if (passwordData.newPassword.length < 6) {
+      setPasswordError('La nueva contraseña debe tener al menos 6 caracteres');
+      return;
+    }
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setPasswordError('Las contraseñas no coinciden');
+      return;
+    }
+
+    setPasswordLoading(true);
+    try {
+      const user = firebaseAuth.currentUser;
+      if (!user || !user.email) throw new Error('No hay sesión activa');
+
+      // Re-autenticar con contraseña actual
+      const credential = EmailAuthProvider.credential(user.email, passwordData.currentPassword);
+      await reauthenticateWithCredential(user, credential);
+
+      // Cambiar contraseña
+      await updatePassword(user, passwordData.newPassword);
+
+      setPasswordSuccess('Contraseña actualizada correctamente');
+      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (err: any) {
+      if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        setPasswordError('La contraseña actual es incorrecta');
+      } else if (err.code === 'auth/weak-password') {
+        setPasswordError('La contraseña es muy débil');
+      } else {
+        setPasswordError(err.message || 'Error al cambiar la contraseña');
+      }
+    } finally {
+      setPasswordLoading(false);
     }
   };
 
@@ -479,6 +541,106 @@ export default function EditarPerfil() {
                 </div>
               </div>
             </div>
+
+            {/* Cambiar Contraseña */}
+            {!isGoogleUser && (
+              <div>
+                <h3 className="text-lg font-bold text-textPrimary mb-4">Cambiar Contraseña</h3>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-textSecondary text-sm font-medium mb-2">
+                      Contraseña Actual
+                    </label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-textSecondary" size={18} />
+                      <Input
+                        type={showCurrentPassword ? 'text' : 'password'}
+                        value={passwordData.currentPassword}
+                        onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                        placeholder="••••••••"
+                        className="pl-10 pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-textSecondary hover:text-textPrimary"
+                      >
+                        {showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-textSecondary text-sm font-medium mb-2">
+                      Nueva Contraseña
+                    </label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-textSecondary" size={18} />
+                      <Input
+                        type={showNewPassword ? 'text' : 'password'}
+                        value={passwordData.newPassword}
+                        onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                        placeholder="Mínimo 6 caracteres"
+                        className="pl-10 pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-textSecondary hover:text-textPrimary"
+                      >
+                        {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-textSecondary text-sm font-medium mb-2">
+                      Confirmar Nueva Contraseña
+                    </label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-textSecondary" size={18} />
+                      <Input
+                        type={showNewPassword ? 'text' : 'password'}
+                        value={passwordData.confirmPassword}
+                        onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                        placeholder="Repetí la nueva contraseña"
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+
+                  {passwordError && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="bg-red-500/10 border border-red-500/30 rounded-lg p-3"
+                    >
+                      <p className="text-red-500 text-sm">{passwordError}</p>
+                    </motion.div>
+                  )}
+
+                  {passwordSuccess && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="bg-green-500/10 border border-green-500/30 rounded-lg p-3"
+                    >
+                      <p className="text-green-500 text-sm">{passwordSuccess}</p>
+                    </motion.div>
+                  )}
+
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={handleChangePassword}
+                    disabled={passwordLoading || !passwordData.currentPassword || !passwordData.newPassword}
+                    className="w-full"
+                  >
+                    {passwordLoading ? 'Cambiando...' : 'Cambiar Contraseña'}
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* Error */}
             {error && (

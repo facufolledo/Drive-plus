@@ -10,6 +10,7 @@ import ModalHorariosPareja from './ModalHorariosPareja';
 import ModalCambiarHorario from './ModalCambiarHorario';
 import { AdminBadge, AdminId } from './AdminBadge';
 import html2canvas from 'html2canvas';
+import FixtureStoryView from './FixtureStoryView';
 
 interface TorneoFixtureProps {
   torneoId: number;
@@ -35,6 +36,8 @@ export default function TorneoFixture({ torneoId, esOrganizador }: TorneoFixture
   const [modalHorariosOpen, setModalHorariosOpen] = useState(false);
   const [partidoEditando, setPartidoEditando] = useState<any>(null);
   const [modalCambiarHorarioOpen, setModalCambiarHorarioOpen] = useState(false);
+  const [storyViewOpen, setStoryViewOpen] = useState(false);
+  const [torneoNombre, setTorneoNombre] = useState('');
 
   // Helper para parsear fechas sin conversión de zona horaria
   const parseFechaLocal = (fechaStr: string) => {
@@ -83,11 +86,12 @@ export default function TorneoFixture({ torneoId, esOrganizador }: TorneoFixture
     
     try {
       setLoading(true);
-      const [partidosResponse, zonasData, canchasData, categoriasData] = await Promise.all([
+      const [partidosResponse, zonasData, canchasData, categoriasData, torneoData] = await Promise.all([
         torneoService.listarPartidos(torneoId),
         torneoService.listarZonas(torneoId),
         torneoService.listarCanchas(torneoId).catch(() => []),
-        torneoService.listarCategorias(torneoId).catch(() => [])
+        torneoService.listarCategorias(torneoId).catch(() => []),
+        torneoService.obtenerTorneo(torneoId).catch(() => null)
       ]);
       // El endpoint retorna { total, partidos }, necesitamos solo el array
       const partidosArray = Array.isArray(partidosResponse) 
@@ -97,6 +101,7 @@ export default function TorneoFixture({ torneoId, esOrganizador }: TorneoFixture
       setZonas(zonasData);
       setCanchas(canchasData);
       setCategorias(categoriasData);
+      if (torneoData?.nombre) setTorneoNombre(torneoData.nombre);
     } catch (error) {
       console.error('Error al cargar datos:', error);
     } finally {
@@ -644,7 +649,17 @@ export default function TorneoFixture({ torneoId, esOrganizador }: TorneoFixture
         </div>
         
         <div className="flex items-center gap-2 self-end sm:self-auto">
-          {/* Botón capturar para Instagram */}
+          {/* Botón planilla para Instagram */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setStoryViewOpen(true)}
+            className="flex items-center gap-2 text-xs bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 hover:from-purple-500/30 hover:to-pink-500/30"
+          >
+            <Camera size={14} />
+            Planilla IG
+          </Button>
+          {/* Botón capturar screenshot */}
           <Button
             variant="ghost"
             size="sm"
@@ -904,6 +919,23 @@ export default function TorneoFixture({ torneoId, esOrganizador }: TorneoFixture
           }}
         />
       )}
+
+      {/* Planilla IG - Canvas */}
+      <FixtureStoryView
+        isOpen={storyViewOpen}
+        onClose={() => setStoryViewOpen(false)}
+        torneoNombre={torneoNombre || `Torneo ${torneoId}`}
+        categoriaNombre={categorias.find(c => c.id === categoriaFiltro)?.nombre || 'Categoría'}
+        zonasConPartidos={zonasConPartidos.filter(z => {
+          // Excluir playoffs (zonas sin ID real o con partidos que tienen fase)
+          if (z.id === 'sin_zona') return false;
+          const primerPartido = z.partidos[0];
+          if (primerPartido?.fase && ['semifinal', 'semis', 'final', 'cuartos', '4tos', '8vos', '16avos'].includes(primerPartido.fase)) return false;
+          return true;
+        })}
+        canchas={canchas}
+        parseFechaLocal={parseFechaLocal}
+      />
     </div>
   );
 }

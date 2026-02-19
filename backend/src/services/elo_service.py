@@ -198,7 +198,7 @@ class EloService:
         """
         return max(cap_loss, min(cap_win, delta))
     
-    def split_team_delta(self, delta_team: float, r1: float, r2: float, mode: str = "inverse") -> Tuple[float, float]:
+    def split_team_delta(self, delta_team: float, r1: float, r2: float, mode: str = "proportional") -> Tuple[float, float]:
         """
         Repartir delta del equipo entre jugadores
         
@@ -206,7 +206,7 @@ class EloService:
             delta_team: Delta total del equipo
             r1: Rating del jugador 1
             r2: Rating del jugador 2
-            mode: Modo de reparto ("equal", "inverse")
+            mode: Modo de reparto ("equal", "inverse", "proportional")
             
         Returns:
             Tuple[float, float]: (delta_jugador_1, delta_jugador_2)
@@ -214,14 +214,20 @@ class EloService:
         if mode == "equal":
             return delta_team / 2, delta_team / 2
         elif mode == "inverse":
-            # pesos ∝ 1/ri (evita dependencia del compañero)
+            # pesos ∝ 1/ri (jugador de menor rating absorbe más)
             w1 = 1.0 / max(1.0, r1)
             w2 = 1.0 / max(1.0, r2)
             s = w1 + w2
             return delta_team * (w1 / s), delta_team * (w2 / s)
+        elif mode == "proportional":
+            # pesos ∝ ri (jugador de mayor rating absorbe más)
+            w1 = max(1.0, r1)
+            w2 = max(1.0, r2)
+            s = w1 + w2
+            return delta_team * (w1 / s), delta_team * (w2 / s)
         else:
-            # Default a inverse
-            return self.split_team_delta(delta_team, r1, r2, "inverse")
+            # Default a proportional
+            return self.split_team_delta(delta_team, r1, r2, "proportional")
     
     def calculate_dominant_set_bonus(self, sets_detail: List[Dict]) -> float:
         """
@@ -581,13 +587,13 @@ class EloService:
             delta_cap_a, 
             team_a_players[0]["rating"], 
             team_a_players[1]["rating"], 
-            mode="inverse"
+            mode="proportional"
         )
         db1, db2 = self.split_team_delta(
             delta_cap_b, 
             team_b_players[0]["rating"], 
             team_b_players[1]["rating"], 
-            mode="inverse"
+            mode="proportional"
         )
         
         # 10. Calcular nuevos ratings (redondeados)

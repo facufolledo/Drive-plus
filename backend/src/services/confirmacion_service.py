@@ -353,26 +353,30 @@ class ConfirmacionService:
         if not resultado_db:
             raise ValueError("El partido no tiene resultado cargado")
         
-        # MAPEAR CORRECTAMENTE EQUIPOS PARA ELO (FIX CRÍTICO)
-        # Problema: equipo1/equipo2 != equipoA/equipoB necesariamente
-        # Solución: Determinar correspondencia basándose en jugadores
+        # MAPEAR CORRECTAMENTE EQUIPOS PARA ELO (FIX CRÍTICO v2)
+        # En resultados_partidos: eq1/eq2 corresponden a equipo 1/equipo 2 del partido
+        # Por defecto, equipo1 = equipoA (mapeo directo)
+        # Solo invertir si resultado_padel JSON indica lo contrario
         
         # Obtener información de jugadores por equipo del resultado JSON
         resultado_json = partido.resultado_padel or {}
         jugadores_resultado = resultado_json.get('jugadores', {})
         jugadores_equipoA = jugadores_resultado.get('equipoA', [])
-        jugadores_equipoB = jugadores_resultado.get('equipoB', [])
         
         # Calcular games totales desde detalle_sets (ANTES de usarlos en el if/else)
         games_a = sum(set_data.get('juegos_eq1', 0) for set_data in resultado_db.detalle_sets)
         games_b = sum(set_data.get('juegos_eq2', 0) for set_data in resultado_db.detalle_sets)
         
         # Determinar si equipo1 corresponde a equipoA o equipoB
-        equipo1_es_equipoA = False
+        # DEFAULT: True (mapeo directo eq1=eqA, eq2=eqB)
+        # Solo cambiar si hay datos JSON que indiquen lo contrario
+        equipo1_es_equipoA = True
         if jugadores_equipoA and equipo1:
             ids_equipo1 = {j.id_usuario for j in equipo1}
             ids_equipoA = {j.get('id') for j in jugadores_equipoA if j.get('id')}
-            equipo1_es_equipoA = bool(ids_equipo1.intersection(ids_equipoA))
+            # Solo si hay IDs válidos en ambos lados, verificar correspondencia
+            if ids_equipoA:
+                equipo1_es_equipoA = bool(ids_equipo1.intersection(ids_equipoA))
         
         # Asignar sets y games según la correspondencia
         if equipo1_es_equipoA:

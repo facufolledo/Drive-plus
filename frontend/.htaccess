@@ -1,34 +1,26 @@
 # Configuración para Drive+ en Hostinger
-# Este archivo debe ir en public_html/Drive/.htaccess
+# SPA - Redirigir todas las rutas a index.html
 
 # Habilitar rewrite engine
 RewriteEngine On
-
-# Configurar base para el subdirectorio Drive
-RewriteBase /Drive/
+RewriteBase /
 
 # Manejar rutas de React Router (SPA)
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
-RewriteCond %{REQUEST_URI} !^/Drive/assets/
-RewriteRule ^(.*)$ /Drive/index.html [L,QSA]
+RewriteCond %{REQUEST_URI} !^/assets/
+RewriteRule ^(.*)$ /index.html [L,QSA]
 
 # Configurar headers para assets
 <FilesMatch "\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)$">
-    # Cache por 1 año
     ExpiresActive On
     ExpiresDefault "access plus 1 year"
-    
-    # Headers de cache
     Header set Cache-Control "public, max-age=31536000, immutable"
-    
-    # CORS para assets
     Header set Access-Control-Allow-Origin "*"
 </FilesMatch>
 
-# Configurar headers para HTML
+# No cache para HTML
 <FilesMatch "\.html$">
-    # No cache para HTML
     ExpiresActive On
     ExpiresDefault "access plus 0 seconds"
     Header set Cache-Control "no-cache, no-store, must-revalidate"
@@ -50,12 +42,12 @@ RewriteRule ^(.*)$ /Drive/index.html [L,QSA]
     AddOutputFilterByType DEFLATE application/json
 </IfModule>
 
-# Configurar tipos MIME
+# Tipos MIME
 AddType application/javascript .js
 AddType text/css .css
 AddType image/svg+xml .svg
 
-# Seguridad básica
+# Seguridad
 <IfModule mod_headers.c>
     Header always set X-Content-Type-Options nosniff
     Header always set X-Frame-Options DENY
@@ -63,11 +55,11 @@ AddType image/svg+xml .svg
     Header always set Referrer-Policy "strict-origin-when-cross-origin"
 </IfModule>
 
-# Prevenir acceso a archivos sensibles
+# Prevenir acceso a archivos ocultos
 <Files ~ "^\.">
     Order allow,deny
     Deny from all
 </Files>
 
-# Error pages personalizadas
-ErrorDocument 404 /Drive/index.html
+# Error 404 -> SPA
+ErrorDocument 404 /index.html
