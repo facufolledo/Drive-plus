@@ -659,17 +659,6 @@ export default function TorneoFixture({ torneoId, esOrganizador }: TorneoFixture
             <Camera size={14} />
             Planilla IG
           </Button>
-          {/* Botón capturar screenshot */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={capturarFixture}
-            disabled={capturando}
-            className="flex items-center gap-2 text-xs"
-          >
-            <Camera size={14} />
-            {capturando ? 'Capturando...' : 'Capturar'}
-          </Button>
         </div>
       </div>
 
