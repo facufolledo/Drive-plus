@@ -576,7 +576,7 @@ class TorneoFixtureGlobalService:
                 )
                 
                 if not (pareja1_disponible and pareja2_disponible):
-                    print(f"      ❌ Slot rechazado por restricciones horarias")
+# DEBUG: print(f"      ❌ Slot rechazado por restricciones horarias")
                     continue
                 
                 # 2. VERIFICAR TIEMPO MÍNIMO ENTRE PARTIDOS (180 MINUTOS = 3 HORAS)
@@ -587,7 +587,7 @@ class TorneoFixtureGlobalService:
                     for fecha_hora_existente in partidos_por_jugador[jugador_id]:
                         diferencia_minutos = abs((fecha_hora_slot - fecha_hora_existente).total_seconds() / 60)
                         if diferencia_minutos < 180:  # Mínimo 180 minutos (3 horas)
-                            print(f"      ❌ Jugador {jugador_id} tiene partido muy cercano ({diferencia_minutos:.0f} mins)")
+# DEBUG: print(f"      ❌ Jugador {jugador_id} tiene partido muy cercano ({diferencia_minutos:.0f} mins)")
                             conflicto_tiempo = True
                             break
                     if conflicto_tiempo:
@@ -606,7 +606,7 @@ class TorneoFixtureGlobalService:
                         break
                 
                 if not cancha_libre:
-                    print(f"      ❌ No hay canchas disponibles en este slot")
+# DEBUG: print(f"      ❌ No hay canchas disponibles en este slot")
                     continue
                 
                 # ✅ SLOT VÁLIDO ENCONTRADO
@@ -747,7 +747,7 @@ class TorneoFixtureGlobalService:
             # 🔴 CORRECCIÓN: Si el partido empieza ANTES que el fin de la restricción
             # Y el partido termina DESPUÉS del inicio de la restricción
             if hora_mins < fin_mins and partido_fin > inicio_mins:
-                print(f"         ❌ SOLAPAMIENTO con restricción {inicio_mins//60:02d}:{inicio_mins%60:02d}-{fin_mins//60:02d}:{fin_mins%60:02d}")
+# DEBUG: print(f"         ❌ SOLAPAMIENTO con restricción {inicio_mins//60:02d}:{inicio_mins%60:02d}-{fin_mins//60:02d}:{fin_mins%60:02d}")
 # DEBUG: print(f"            Partido: {hora_mins//60:02d}:{hora_mins%60:02d}-{partido_fin//60:02d}:{partido_fin%60:02d}")
 # DEBUG: print(f"            Restricción: {inicio_mins//60:02d}:{inicio_mins%60:02d}-{fin_mins//60:02d}:{fin_mins%60:02d}")
 # DEBUG: print(f"            Condición: {hora_mins} <= {fin_mins} AND {partido_fin} > {inicio_mins}")
