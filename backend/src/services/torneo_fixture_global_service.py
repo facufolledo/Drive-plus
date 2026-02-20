@@ -528,7 +528,11 @@ class TorneoFixtureGlobalService:
                             pareja2.jugador2_id
                         ]
                         for jugador_id in jugadores_existentes:
-                            partidos_por_jugador[jugador_id].append(partido_existente.fecha_hora)
+                            # Convertir a naive para evitar error offset-naive vs offset-aware
+                            fh = partido_existente.fecha_hora
+                            if fh.tzinfo is not None:
+                                fh = fh.replace(tzinfo=None)
+                            partidos_por_jugador[jugador_id].append(fh)
         
         # Ordenar partidos por prioridad (ej: zonas con menos partidos primero)
         partidos_ordenados = sorted(partidos, key=lambda p: p['zona_id'])
