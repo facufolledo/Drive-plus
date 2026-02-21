@@ -282,16 +282,13 @@ class TorneoPlayoffService:
     ) -> List[Partido]:
         """
         Genera bracket según formato oficial APA para 2-6 zonas.
-        Cada formato define los cruces por ronda usando referencias a
-        (zona_letra, posicion). Los numero_partido se asignan para que
-        avanzar_ganador funcione con: siguiente = (n+1)//2, impar→p1, par→p2.
 
-        Formatos APA:
-        - 2 zonas (6-8 parejas): semis + final
-        - 3 zonas (9-11): 4tos + semis + final
-        - 4 zonas (12-14): 4tos + semis + final
-        - 5 zonas (15-17): 8vos + 4tos + semis + final
-        - 6 zonas (18-20): 8vos + 4tos + semis + final
+        Los BYEs NO se crean como partidos — en su lugar, las parejas que
+        pasan directo se setean directamente en la ronda siguiente.
+        Solo se crean partidos reales (ambas parejas presentes).
+
+        numero_partido sigue la convención de bracket binario para que
+        avanzar_ganador funcione: siguiente = (n+1)//2, impar→p1, par→p2.
         """
         # Agrupar por zona
         zonas: Dict[str, List[Dict]] = {}
@@ -320,34 +317,36 @@ class TorneoPlayoffService:
             return lista[pos - 1]['pareja_id'] if pos - 1 < len(lista) else None
 
         # Definir estructura del bracket por cantidad de zonas.
-        # Cada ronda es una lista de tuplas (p1, p2) donde cada elemento es
-        # (letra, pos) o None (BYE) o 'prev' (viene de ronda anterior).
-        # Los partidos se numeran secuencialmente dentro de cada fase.
+        # Cada ronda es una lista de slots. Cada slot es:
+        #   (zona_ref, zona_ref) — partido real entre dos parejas de zona
+        #   (zona_ref, None)     — BYE, pareja pasa directo (NO se crea partido)
+        #   ('prev', 'prev')     — ambos vienen de ronda anterior
+        # numero_partido se asigna secuencialmente (1, 2, 3...) dentro de cada fase.
+        # La conexión entre rondas usa: partido N de ronda R alimenta
+        # partido ceil(N/2) de ronda R+1, como p1 si N es impar, p2 si N es par.
 
         if num_zonas == 2:
-            # 2 zonas: semis + final (4 parejas, bracket de 4)
             rondas = [
                 ('semis', [
-                    (('A', 1), ('B', 2)),  # Semi#1: 1°A vs 2°B
-                    (('A', 2), ('B', 1)),  # Semi#2: 2°A vs 1°B
+                    (('A', 1), ('B', 2)),
+                    (('A', 2), ('B', 1)),
                 ]),
                 ('final', [
-                    ('prev', 'prev'),  # Final
+                    ('prev', 'prev'),
                 ]),
             ]
         elif num_zonas == 3:
-            # 3 zonas: 4tos(con BYEs) + semis + final
-            # 4tos#1: BYE 1°A → pasa
-            # 4tos#2: 2°B vs 2°C
-            # 4tos#3: BYE 1°B → pasa
-            # 4tos#4: 1°C vs 2°A
-            # Semis: ganador(1,2) vs ganador(3,4)
+            # APA 3 zonas: 4tos con 2 BYEs + semis + final
+            # Slot 1: BYE 1°A (no se crea, se setea en semi#1 p1)
+            # Slot 2: 2°B vs 2°C (partido real)
+            # Slot 3: BYE 1°B (no se crea, se setea en semi#2 p1)
+            # Slot 4: 1°C vs 2°A (partido real)
             rondas = [
                 ('4tos', [
-                    (('A', 1), None),      # BYE 1°A
-                    (('B', 2), ('C', 2)),   # 2°B vs 2°C
-                    (('B', 1), None),      # BYE 1°B
-                    (('C', 1), ('A', 2)),   # 1°C vs 2°A
+                    (('A', 1), None),      # BYE → semi#1 p1
+                    (('B', 2), ('C', 2)),   # real → semi#1 p2
+                    (('B', 1), None),      # BYE → semi#2 p1
+                    (('C', 1), ('A', 2)),   # real → semi#2 p2
                 ]),
                 ('semis', [
                     ('prev', 'prev'),
@@ -358,13 +357,13 @@ class TorneoPlayoffService:
                 ]),
             ]
         elif num_zonas == 4:
-            # 4 zonas: 4tos + semis + final (8 parejas, todos juegan)
+            # APA 4 zonas: todos juegan 4tos, sin BYEs
             rondas = [
                 ('4tos', [
-                    (('A', 1), ('C', 2)),  # 4tos#1: 1°A vs 2°C
-                    (('B', 2), ('D', 1)),  # 4tos#2: 2°B vs 1°D
-                    (('C', 1), ('A', 2)),  # 4tos#3: 1°C vs 2°A
-                    (('D', 2), ('B', 1)),  # 4tos#4: 2°D vs 1°B
+                    (('A', 1), ('C', 2)),
+                    (('B', 2), ('D', 1)),
+                    (('C', 1), ('A', 2)),
+                    (('D', 2), ('B', 1)),
                 ]),
                 ('semis', [
                     ('prev', 'prev'),
@@ -375,30 +374,37 @@ class TorneoPlayoffService:
                 ]),
             ]
         elif num_zonas == 5:
-            # 5 zonas: 8vos(con BYEs) + 4tos + semis + final
-            # 8vos#1: BYE 1°A
-            # 8vos#2: 2°B vs 2°C
-            # 8vos#3: 1°E vs 1°D (directo, sin BYE)
-            # 8vos#4: BYE (placeholder vacío para mantener estructura)
-            # Realmente: la imagen muestra:
-            #   Mitad superior: [2°B vs 2°C] → vs 1°A, luego 1°E vs 1°D
-            #   Mitad inferior: 1°C vs 2°E, luego [2°A vs 2°D] → vs 1°B
+            # APA 5 zonas (imagen oficial):
+            # 8vos slot 1: BYE 1°A         → 4tos#1 p1
+            # 8vos slot 2: 2°B vs 2°C      → 4tos#1 p2
+            # 8vos slot 3: BYE 1°E         → 4tos#2 p1
+            # 8vos slot 4: BYE 1°D         → 4tos#2 p2
+            # 8vos slot 5: BYE 1°C         → 4tos#3 p1
+            # 8vos slot 6: BYE 2°E         → 4tos#3 p2
+            # 8vos slot 7: BYE 1°B         → 4tos#4 p2 (via slot 8)
+            # 8vos slot 8: 2°A vs 2°D      → 4tos#4 p1 (via slot 7)
+            # Wait — slot 7 impar → p1, slot 8 par → p2
+            # So: 4tos#4 p1=ganador(slot7=BYE 1°B)=1°B, p2=ganador(slot8=2°A vs 2°D)
+            # But APA image shows: ganador(2°A vs 2°D) vs 1°B
+            # That means ganador should be p1 and 1°B should be p2
+            # To achieve this: slot 7 = 2°A vs 2°D (real), slot 8 = BYE 1°B
+            # Then: 4tos#4 p1=ganador(2°A vs 2°D), p2=1°B ✅
             rondas = [
                 ('8vos', [
-                    (('A', 1), None),       # BYE 1°A
-                    (('B', 2), ('C', 2)),    # 2°B vs 2°C
-                    (('D', 1), None),       # BYE 1°D (placeholder, 1°E vs 1°D va directo a 4tos)
-                    (('E', 1), None),       # BYE 1°E
-                    (('C', 1), None),       # BYE 1°C
-                    (('E', 2), None),       # BYE 2°E (placeholder)
-                    (('B', 1), None),       # BYE 1°B
-                    (('A', 2), ('D', 2)),    # 2°A vs 2°D
+                    (('A', 1), None),       # slot 1: BYE 1°A
+                    (('B', 2), ('C', 2)),    # slot 2: 2°B vs 2°C (real)
+                    (('E', 1), None),       # slot 3: BYE 1°E
+                    (('D', 1), None),       # slot 4: BYE 1°D
+                    (('C', 1), None),       # slot 5: BYE 1°C
+                    (('E', 2), None),       # slot 6: BYE 2°E
+                    (('A', 2), ('D', 2)),    # slot 7: 2°A vs 2°D (real)
+                    (('B', 1), None),       # slot 8: BYE 1°B
                 ]),
                 ('4tos', [
-                    ('prev', 'prev'),  # 1°A vs ganador(2°B vs 2°C)
-                    ('prev', 'prev'),  # 1°E vs 1°D
-                    ('prev', 'prev'),  # 1°C vs 2°E
-                    ('prev', 'prev'),  # ganador(2°A vs 2°D) vs 1°B
+                    ('prev', 'prev'),  # 4tos#1: 1°A vs ganador(2°B vs 2°C)
+                    ('prev', 'prev'),  # 4tos#2: 1°E vs 1°D
+                    ('prev', 'prev'),  # 4tos#3: 1°C vs 2°E
+                    ('prev', 'prev'),  # 4tos#4: ganador(2°A vs 2°D) vs 1°B
                 ]),
                 ('semis', [
                     ('prev', 'prev'),
@@ -409,17 +415,17 @@ class TorneoPlayoffService:
                 ]),
             ]
         else:  # num_zonas == 6
-            # 6 zonas: 8vos(con BYEs) + 4tos + semis + final
+            # APA 6 zonas: 8vos con 4 BYEs + 4tos + semis + final
             rondas = [
                 ('8vos', [
-                    (('A', 1), None),               # BYE 1°A
-                    (('F', 2), ('C', 2)),            # 2°F vs 2°C
-                    (('D', 1), None),               # BYE 1°D
-                    (('E', 1), ('B', 2)),            # 1°E vs 2°B
-                    (('C', 1), None),               # BYE 1°C
-                    (('A', 2), ('F', 1)),            # 2°A vs 1°F
-                    (('B', 1), None),               # BYE 1°B
-                    (('E', 2), ('D', 2)),            # 2°E vs 2°D
+                    (('A', 1), None),               # slot 1: BYE 1°A
+                    (('F', 2), ('C', 2)),            # slot 2: 2°F vs 2°C (real)
+                    (('D', 1), None),               # slot 3: BYE 1°D
+                    (('E', 1), ('B', 2)),            # slot 4: 1°E vs 2°B (real)
+                    (('C', 1), None),               # slot 5: BYE 1°C
+                    (('A', 2), ('F', 1)),            # slot 6: 2°A vs 1°F (real)
+                    (('B', 1), None),               # slot 7: BYE 1°B
+                    (('E', 2), ('D', 2)),            # slot 8: 2°E vs 2°D (real)
                 ]),
                 ('4tos', [
                     ('prev', 'prev'),
@@ -494,6 +500,7 @@ class TorneoPlayoffService:
 
         db.commit()
         return partidos_creados
+
 
     
     @staticmethod
