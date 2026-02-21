@@ -189,122 +189,312 @@ class TorneoPlayoffService:
         categoria_id: Optional[int]
     ) -> List[Partido]:
         """
-        Genera bracket completo con BYEs explícitos en la BD
-        
-        - Calcula potencia de 2 necesaria
-        - Crea TODOS los partidos (incluyendo BYEs)
-        - BYEs tienen pareja2_id = NULL y ganador ya seteado
+        Genera bracket según formato APA (Asociación Padel Argentino).
+        Soporta 2, 3, 4, 5 y 6 zonas con los cruces oficiales.
         """
+        # Detectar cantidad de zonas
+        zonas_set = []
+        for c in clasificados:
+            z = c.get('zona_nombre')
+            if z and z not in zonas_set:
+                zonas_set.append(z)
+        num_zonas = len(zonas_set)
+
+        if num_zonas >= 2:
+            return TorneoPlayoffService._generar_bracket_apa(
+                db, torneo_id, clasificados, user_id, categoria_id, num_zonas
+            )
+
+        # Fallback sin zonas: bracket estándar
         num_clasificados = len(clasificados)
         bracket_size = TorneoPlayoffService._next_power_of_two(num_clasificados)
-        
-        # Limitar a 16
         if bracket_size > 16:
             bracket_size = 16
             clasificados = clasificados[:16]
-            num_clasificados = 16
-        
-        num_byes = bracket_size - num_clasificados
-        
-        # Reordenar para evitar que rivales de la misma zona se crucen hasta la final
+
         clasificados_ordenados = TorneoPlayoffService._reordenar_clasificados_evitando_rematches_zona(
             clasificados, bracket_size
         )
-        
-        # Determinar fases
         fases = TorneoPlayoffService._determinar_fases(bracket_size)
         num_rondas = len(fases)
-        
-        # Generar emparejamientos de primera ronda (estándar de bracket)
         emparejamientos = TorneoPlayoffService._generar_emparejamientos(bracket_size)
-        
-        # Crear diccionario de clasificados por seed
         clasificados_dict = {c['seed']: c for c in clasificados_ordenados}
-        
+
         partidos_creados = []
-        # Estructura para trackear partidos por ronda y posición
-        # partidos_ronda[ronda][posicion] = partido
         partidos_ronda: Dict[int, Dict[int, Partido]] = {i: {} for i in range(num_rondas)}
-        
-        # RONDA 1: Crear todos los partidos (normales y BYEs)
         fase_inicial = fases[0]
-        
+
         for i, (seed1, seed2) in enumerate(emparejamientos):
             c1 = clasificados_dict.get(seed1)
             c2 = clasificados_dict.get(seed2)
-            
             pareja1_id = c1['pareja_id'] if c1 else None
             pareja2_id = c2['pareja_id'] if c2 else None
-            
-            # Determinar si es BYE
             es_bye = (pareja1_id is not None and pareja2_id is None) or \
                      (pareja1_id is None and pareja2_id is not None)
-            
-            # Si es BYE, el ganador es la pareja que existe
             ganador_id = None
             estado = 'pendiente'
             if es_bye:
                 ganador_id = pareja1_id or pareja2_id
                 estado = 'bye'
-            
             partido = Partido(
-                id_torneo=torneo_id,
-                categoria_id=categoria_id,
-                pareja1_id=pareja1_id,
-                pareja2_id=pareja2_id,
-                ganador_pareja_id=ganador_id,
-                fase=fase_inicial,
-                numero_partido=i + 1,
-                estado=estado,
-                fecha=datetime.now(),
-                id_creador=user_id,
-                tipo='torneo'
+                id_torneo=torneo_id, categoria_id=categoria_id,
+                pareja1_id=pareja1_id, pareja2_id=pareja2_id,
+                ganador_pareja_id=ganador_id, fase=fase_inicial,
+                numero_partido=i + 1, estado=estado,
+                fecha=datetime.now(), id_creador=user_id, tipo='torneo'
             )
             db.add(partido)
             partidos_creados.append(partido)
             partidos_ronda[0][i + 1] = partido
-        
+
         db.flush()
-        
-        # RONDAS SIGUIENTES: Crear partidos vacíos o con ganadores de BYE
+
         for ronda_idx in range(1, num_rondas):
             fase = fases[ronda_idx]
             partidos_ronda_anterior = partidos_ronda[ronda_idx - 1]
             num_partidos_ronda = bracket_size // (2 ** (ronda_idx + 1))
-            
             for i in range(num_partidos_ronda):
-                # Cada partido recibe ganadores de 2 partidos de la ronda anterior
-                partido_origen_1 = partidos_ronda_anterior.get(i * 2 + 1)
-                partido_origen_2 = partidos_ronda_anterior.get(i * 2 + 2)
-                
-                # Si el partido origen es BYE, ya sabemos el ganador
-                pareja1_id = None
-                pareja2_id = None
-                
-                if partido_origen_1 and partido_origen_1.estado == 'bye':
-                    pareja1_id = partido_origen_1.ganador_pareja_id
-                
-                if partido_origen_2 and partido_origen_2.estado == 'bye':
-                    pareja2_id = partido_origen_2.ganador_pareja_id
-                
+                po1 = partidos_ronda_anterior.get(i * 2 + 1)
+                po2 = partidos_ronda_anterior.get(i * 2 + 2)
+                p1 = po1.ganador_pareja_id if po1 and po1.estado == 'bye' else None
+                p2 = po2.ganador_pareja_id if po2 and po2.estado == 'bye' else None
+                partido = Partido(
+                    id_torneo=torneo_id, categoria_id=categoria_id,
+                    pareja1_id=p1, pareja2_id=p2, fase=fase,
+                    numero_partido=i + 1, estado='pendiente',
+                    fecha=datetime.now(), id_creador=user_id, tipo='torneo'
+                )
+                db.add(partido)
+                partidos_creados.append(partido)
+                partidos_ronda[ronda_idx][i + 1] = partido
+
+        db.commit()
+        return partidos_creados
+
+    @staticmethod
+    def _generar_bracket_apa(
+        db: Session,
+        torneo_id: int,
+        clasificados: List[Dict],
+        user_id: int,
+        categoria_id: Optional[int],
+        num_zonas: int
+    ) -> List[Partido]:
+        """
+        Genera bracket según formato oficial APA para 2-6 zonas.
+        Cada formato define los cruces por ronda usando referencias a
+        (zona_letra, posicion). Los numero_partido se asignan para que
+        avanzar_ganador funcione con: siguiente = (n+1)//2, impar→p1, par→p2.
+
+        Formatos APA:
+        - 2 zonas (6-8 parejas): semis + final
+        - 3 zonas (9-11): 4tos + semis + final
+        - 4 zonas (12-14): 4tos + semis + final
+        - 5 zonas (15-17): 8vos + 4tos + semis + final
+        - 6 zonas (18-20): 8vos + 4tos + semis + final
+        """
+        # Agrupar por zona
+        zonas: Dict[str, List[Dict]] = {}
+        nombres_zonas_orden = []
+        for c in clasificados:
+            z = c.get('zona_nombre', '')
+            if z not in zonas:
+                zonas[z] = []
+                nombres_zonas_orden.append(z)
+            zonas[z].append(c)
+
+        for z in zonas:
+            zonas[z] = sorted(zonas[z], key=lambda x: (x['posicion'], -x.get('puntos', 0)))
+
+        zona_map = {}
+        letras = ['A', 'B', 'C', 'D', 'E', 'F']
+        for i, nombre in enumerate(nombres_zonas_orden[:num_zonas]):
+            zona_map[letras[i]] = nombre
+
+        def gp(letra: str, pos: int) -> Optional[int]:
+            """Get pareja_id by zona letter and position (1=1st, 2=2nd)"""
+            nombre = zona_map.get(letra)
+            if not nombre or nombre not in zonas:
+                return None
+            lista = zonas[nombre]
+            return lista[pos - 1]['pareja_id'] if pos - 1 < len(lista) else None
+
+        # Definir estructura del bracket por cantidad de zonas.
+        # Cada ronda es una lista de tuplas (p1, p2) donde cada elemento es
+        # (letra, pos) o None (BYE) o 'prev' (viene de ronda anterior).
+        # Los partidos se numeran secuencialmente dentro de cada fase.
+
+        if num_zonas == 2:
+            # 2 zonas: semis + final (4 parejas, bracket de 4)
+            rondas = [
+                ('semis', [
+                    (('A', 1), ('B', 2)),  # Semi#1: 1°A vs 2°B
+                    (('A', 2), ('B', 1)),  # Semi#2: 2°A vs 1°B
+                ]),
+                ('final', [
+                    ('prev', 'prev'),  # Final
+                ]),
+            ]
+        elif num_zonas == 3:
+            # 3 zonas: 4tos(con BYEs) + semis + final
+            # 4tos#1: BYE 1°A → pasa
+            # 4tos#2: 2°B vs 2°C
+            # 4tos#3: BYE 1°B → pasa
+            # 4tos#4: 1°C vs 2°A
+            # Semis: ganador(1,2) vs ganador(3,4)
+            rondas = [
+                ('4tos', [
+                    (('A', 1), None),      # BYE 1°A
+                    (('B', 2), ('C', 2)),   # 2°B vs 2°C
+                    (('B', 1), None),      # BYE 1°B
+                    (('C', 1), ('A', 2)),   # 1°C vs 2°A
+                ]),
+                ('semis', [
+                    ('prev', 'prev'),
+                    ('prev', 'prev'),
+                ]),
+                ('final', [
+                    ('prev', 'prev'),
+                ]),
+            ]
+        elif num_zonas == 4:
+            # 4 zonas: 4tos + semis + final (8 parejas, todos juegan)
+            rondas = [
+                ('4tos', [
+                    (('A', 1), ('C', 2)),  # 4tos#1: 1°A vs 2°C
+                    (('B', 2), ('D', 1)),  # 4tos#2: 2°B vs 1°D
+                    (('C', 1), ('A', 2)),  # 4tos#3: 1°C vs 2°A
+                    (('D', 2), ('B', 1)),  # 4tos#4: 2°D vs 1°B
+                ]),
+                ('semis', [
+                    ('prev', 'prev'),
+                    ('prev', 'prev'),
+                ]),
+                ('final', [
+                    ('prev', 'prev'),
+                ]),
+            ]
+        elif num_zonas == 5:
+            # 5 zonas: 8vos(con BYEs) + 4tos + semis + final
+            # 8vos#1: BYE 1°A
+            # 8vos#2: 2°B vs 2°C
+            # 8vos#3: 1°E vs 1°D (directo, sin BYE)
+            # 8vos#4: BYE (placeholder vacío para mantener estructura)
+            # Realmente: la imagen muestra:
+            #   Mitad superior: [2°B vs 2°C] → vs 1°A, luego 1°E vs 1°D
+            #   Mitad inferior: 1°C vs 2°E, luego [2°A vs 2°D] → vs 1°B
+            rondas = [
+                ('8vos', [
+                    (('A', 1), None),       # BYE 1°A
+                    (('B', 2), ('C', 2)),    # 2°B vs 2°C
+                    (('D', 1), None),       # BYE 1°D (placeholder, 1°E vs 1°D va directo a 4tos)
+                    (('E', 1), None),       # BYE 1°E
+                    (('C', 1), None),       # BYE 1°C
+                    (('E', 2), None),       # BYE 2°E (placeholder)
+                    (('B', 1), None),       # BYE 1°B
+                    (('A', 2), ('D', 2)),    # 2°A vs 2°D
+                ]),
+                ('4tos', [
+                    ('prev', 'prev'),  # 1°A vs ganador(2°B vs 2°C)
+                    ('prev', 'prev'),  # 1°E vs 1°D
+                    ('prev', 'prev'),  # 1°C vs 2°E
+                    ('prev', 'prev'),  # ganador(2°A vs 2°D) vs 1°B
+                ]),
+                ('semis', [
+                    ('prev', 'prev'),
+                    ('prev', 'prev'),
+                ]),
+                ('final', [
+                    ('prev', 'prev'),
+                ]),
+            ]
+        else:  # num_zonas == 6
+            # 6 zonas: 8vos(con BYEs) + 4tos + semis + final
+            rondas = [
+                ('8vos', [
+                    (('A', 1), None),               # BYE 1°A
+                    (('F', 2), ('C', 2)),            # 2°F vs 2°C
+                    (('D', 1), None),               # BYE 1°D
+                    (('E', 1), ('B', 2)),            # 1°E vs 2°B
+                    (('C', 1), None),               # BYE 1°C
+                    (('A', 2), ('F', 1)),            # 2°A vs 1°F
+                    (('B', 1), None),               # BYE 1°B
+                    (('E', 2), ('D', 2)),            # 2°E vs 2°D
+                ]),
+                ('4tos', [
+                    ('prev', 'prev'),
+                    ('prev', 'prev'),
+                    ('prev', 'prev'),
+                    ('prev', 'prev'),
+                ]),
+                ('semis', [
+                    ('prev', 'prev'),
+                    ('prev', 'prev'),
+                ]),
+                ('final', [
+                    ('prev', 'prev'),
+                ]),
+            ]
+
+        # Generar partidos ronda por ronda
+        partidos_creados = []
+        partidos_por_fase: Dict[str, List[Partido]] = {}
+
+        for ronda_idx, (fase, cruces) in enumerate(rondas):
+            partidos_por_fase[fase] = []
+
+            for i, cruce in enumerate(cruces):
+                num = i + 1
+                p1_id = None
+                p2_id = None
+
+                if ronda_idx == 0:
+                    # Primera ronda: resolver desde zonas
+                    c1, c2 = cruce
+                    if c1 is not None and isinstance(c1, tuple):
+                        p1_id = gp(c1[0], c1[1])
+                    if c2 is not None and isinstance(c2, tuple):
+                        p2_id = gp(c2[0], c2[1])
+                else:
+                    # Rondas siguientes: p1 y p2 vienen de ganadores de ronda anterior
+                    fase_anterior = rondas[ronda_idx - 1][0]
+                    partidos_ant = partidos_por_fase.get(fase_anterior, [])
+                    # Partido i recibe ganadores de partidos (i*2) y (i*2+1) de ronda anterior
+                    idx1 = i * 2
+                    idx2 = i * 2 + 1
+                    if idx1 < len(partidos_ant) and partidos_ant[idx1].estado == 'bye':
+                        p1_id = partidos_ant[idx1].ganador_pareja_id
+                    if idx2 < len(partidos_ant) and partidos_ant[idx2].estado == 'bye':
+                        p2_id = partidos_ant[idx2].ganador_pareja_id
+
+                # Determinar BYE: solo en primera ronda (BYEs reales del formato APA).
+                # En rondas siguientes, p2=None significa "rival por determinar", no BYE.
+                es_bye = ronda_idx == 0 and (p1_id is not None and p2_id is None)
+                ganador_id = p1_id if es_bye else None
+                estado = 'bye' if es_bye else 'pendiente'
+
                 partido = Partido(
                     id_torneo=torneo_id,
                     categoria_id=categoria_id,
-                    pareja1_id=pareja1_id,
-                    pareja2_id=pareja2_id,
+                    pareja1_id=p1_id,
+                    pareja2_id=p2_id,
+                    ganador_pareja_id=ganador_id,
                     fase=fase,
-                    numero_partido=i + 1,
-                    estado='pendiente',
+                    numero_partido=num,
+                    estado=estado,
                     fecha=datetime.now(),
                     id_creador=user_id,
                     tipo='torneo'
                 )
                 db.add(partido)
                 partidos_creados.append(partido)
-                partidos_ronda[ronda_idx][i + 1] = partido
-        
+                partidos_por_fase[fase].append(partido)
+
+            db.flush()
+
         db.commit()
         return partidos_creados
+
     
     @staticmethod
     def _determinar_fases(bracket_size: int) -> List[str]:
