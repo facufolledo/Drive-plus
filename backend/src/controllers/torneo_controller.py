@@ -2569,6 +2569,7 @@ def actualizar_horario_playoff(
     current_user: Usuario = Depends(get_current_user)
 ):
     """Actualizar fecha/hora de un partido de playoff. Solo organizadores."""
+    from ..models.driveplus_models import Partido
     partido = db.query(Partido).filter(
         Partido.id_partido == partido_id,
         Partido.id_torneo == torneo_id,

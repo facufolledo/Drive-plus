@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, Clock, AlertTriangle, CheckCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Button from './Button';
@@ -26,32 +26,26 @@ export default function ModalCambiarHorario({
   const [hora, setHora] = useState('');
   const [canchaId, setCanchaId] = useState<number>(1);
   const [canchas, setCanchas] = useState<any[]>([]);
-  const [conflictos, setConflictos] = useState<any[]>([]);
+  const [conflictos, setConflictos] = useState<any[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingCanchas, setLoadingCanchas] = useState(true);
   const [verificandoConflictos, setVerificandoConflictos] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       cargarCanchas();
-      // Pre-llenar con datos actuales si existen
+      setConflictos(null);
       if (partidoActual.fecha_hora) {
-        // Usar el mismo parseo que en TorneoFixture para evitar problemas de zona horaria
-        const fechaStr = partidoActual.fecha_hora;
-        const fecha = new Date(fechaStr);
-        const year = fecha.getUTCFullYear();
-        const month = fecha.getUTCMonth();
-        const day = fecha.getUTCDate();
-        const hours = fecha.getUTCHours();
-        const minutes = fecha.getUTCMinutes();
+        const fechaObj = new Date(partidoActual.fecha_hora);
+        const year = fechaObj.getUTCFullYear();
+        const month = fechaObj.getUTCMonth();
+        const day = fechaObj.getUTCDate();
+        const hours = fechaObj.getUTCHours();
+        const minutes = fechaObj.getUTCMinutes();
         const fechaLocal = new Date(year, month, day, hours, minutes);
-        
-        // Formatear para inputs
-        const fechaISO = fechaLocal.toISOString().split('T')[0];
-        const horaStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-        
-        setFecha(fechaISO);
-        setHora(horaStr);
+        setFecha(fechaLocal.toISOString().split('T')[0]);
+        setHora(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`);
       }
       if (partidoActual.cancha_id) {
         setCanchaId(partidoActual.cancha_id);
@@ -59,43 +53,44 @@ export default function ModalCambiarHorario({
     }
   }, [isOpen, partidoActual]);
 
-  // Verificar conflictos en tiempo real cuando cambian fecha, hora o cancha
+  // Debounced conflict check using GET endpoint
   useEffect(() => {
     if (fecha && hora && canchaId && isOpen) {
-      verificarConflictosPreview();
+      // Reset to loading state immediately
+      setConflictos(null);
+      setVerificandoConflictos(true);
+
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        verificarConflictosPreview();
+      }, 400);
     } else {
-      setConflictos([]);
+      setConflictos(null);
+      setVerificandoConflictos(false);
     }
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
   }, [fecha, hora, canchaId, isOpen]);
 
   const verificarConflictosPreview = async () => {
-    setVerificandoConflictos(true);
     try {
-      const url = `${import.meta.env.VITE_API_URL}/torneos/${torneoId}/partidos/${partidoId}/cambiar-horario`;
       const token = localStorage.getItem('firebase_token');
-      
-      const response = await fetch(url, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          fecha,
-          hora,
-          cancha_id: canchaId
-        })
-      });
-      
-      const data = await response.json();
+      const params = new URLSearchParams({ fecha, hora, cancha_id: String(canchaId) });
+      const url = `${import.meta.env.VITE_API_URL}/torneos/${torneoId}/partidos/${partidoId}/verificar-horario?${params}`;
 
-      if (data.error === 'SOLAPAMIENTO_DETECTADO') {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
         setConflictos(data.conflictos || []);
       } else {
         setConflictos([]);
       }
-    } catch (error) {
-      // Silenciar errores de preview
+    } catch {
       setConflictos([]);
     } finally {
       setVerificandoConflictos(false);
@@ -106,14 +101,12 @@ export default function ModalCambiarHorario({
     try {
       setLoadingCanchas(true);
       const canchasData = await torneoService.listarCanchas(torneoId);
-      // Filtrar solo canchas activas
       const canchasActivas = canchasData.filter((c: any) => c.activa);
       setCanchas(canchasActivas);
       if (canchasActivas.length > 0 && !canchaId) {
         setCanchaId(canchasActivas[0].id);
       }
-    } catch (error) {
-      console.error('Error al cargar canchas:', error);
+    } catch {
       toast.error('Error al cargar canchas');
     } finally {
       setLoadingCanchas(false);
@@ -126,36 +119,36 @@ export default function ModalCambiarHorario({
       return;
     }
 
-    // Si hay conflictos, pedir confirmación
-    if (conflictos.length > 0) {
+    if (conflictos && conflictos.length > 0) {
       const confirmar = window.confirm(
         `⚠️ HAY ${conflictos.length} CONFLICTO(S)\n\n` +
-        `El horario seleccionado se solapa con otros partidos en la misma cancha.\n\n` +
-        `¿Estás seguro de que quieres continuar de todas formas?`
+        conflictos.map(c => `• ${c.mensaje || 'Solapamiento'}: ${c.pareja1} vs ${c.pareja2} (${c.fecha_hora})`).join('\n') +
+        `\n\n¿Estás seguro de que quieres continuar?`
       );
       if (!confirmar) return;
     }
 
     setLoading(true);
-
     try {
       const url = `${import.meta.env.VITE_API_URL}/torneos/${torneoId}/partidos/${partidoId}/cambiar-horario`;
       const token = localStorage.getItem('firebase_token');
-      
+
       const response = await fetch(url, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          fecha,
-          hora,
-          cancha_id: canchaId
-        })
+        body: JSON.stringify({ fecha, hora, cancha_id: canchaId })
       });
-      
+
       const data = await response.json();
+
+      if (data.error === 'SOLAPAMIENTO_DETECTADO') {
+        setConflictos(data.conflictos || []);
+        toast.error(`${data.conflictos?.length || 0} conflicto(s) detectado(s)`);
+        return;
+      }
 
       if (!response.ok) {
         toast.error(data.detail || `Error ${response.status}`);
@@ -163,14 +156,13 @@ export default function ModalCambiarHorario({
       }
 
       if (data.success) {
-        toast.success('✅ Horario actualizado correctamente');
+        toast.success('✅ Horario actualizado');
         onSuccess();
         onClose();
       } else {
         toast.error(data.detail || data.message || 'Error al cambiar horario');
       }
     } catch (error: any) {
-      console.error('Error al cambiar horario:', error);
       toast.error(`Error: ${error.message || 'Error de conexión'}`);
     } finally {
       setLoading(false);
@@ -178,6 +170,9 @@ export default function ModalCambiarHorario({
   };
 
   if (!isOpen) return null;
+
+  const conflictosCancha = conflictos?.filter(c => c.tipo === 'cancha') || [];
+  const conflictosDescanso = conflictos?.filter(c => c.tipo === 'descanso') || [];
 
   return (
     <AnimatePresence>
@@ -201,65 +196,38 @@ export default function ModalCambiarHorario({
                 </p>
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-borderColor/50 rounded-lg transition-colors"
-            >
+            <button onClick={onClose} className="p-2 hover:bg-borderColor/50 rounded-lg transition-colors">
               <X className="w-5 h-5 text-textSecondary" />
             </button>
           </div>
 
           {/* Body */}
           <div className="p-6 space-y-4">
-            {/* Fecha */}
             <div>
-              <label className="block text-sm font-medium text-textPrimary mb-2">
-                Fecha
-              </label>
-              <input
-                type="date"
-                value={fecha}
-                onChange={(e) => setFecha(e.target.value)}
-                className="w-full px-4 py-2 bg-background border border-borderColor rounded-lg text-textPrimary focus:outline-none focus:ring-2 focus:ring-accent"
-              />
+              <label className="block text-sm font-medium text-textPrimary mb-2">Fecha</label>
+              <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)}
+                className="w-full px-4 py-2 bg-background border border-borderColor rounded-lg text-textPrimary focus:outline-none focus:ring-2 focus:ring-accent" />
             </div>
-
-            {/* Hora */}
             <div>
-              <label className="block text-sm font-medium text-textPrimary mb-2">
-                Hora
-              </label>
-              <input
-                type="time"
-                value={hora}
-                onChange={(e) => setHora(e.target.value)}
-                className="w-full px-4 py-2 bg-background border border-borderColor rounded-lg text-textPrimary focus:outline-none focus:ring-2 focus:ring-accent"
-              />
+              <label className="block text-sm font-medium text-textPrimary mb-2">Hora</label>
+              <input type="time" value={hora} onChange={(e) => setHora(e.target.value)}
+                className="w-full px-4 py-2 bg-background border border-borderColor rounded-lg text-textPrimary focus:outline-none focus:ring-2 focus:ring-accent" />
             </div>
-
-            {/* Cancha */}
             <div>
-              <label className="block text-sm font-medium text-textPrimary mb-2">
-                Cancha
-              </label>
+              <label className="block text-sm font-medium text-textPrimary mb-2">Cancha</label>
               {loadingCanchas ? (
                 <div className="text-sm text-textSecondary">Cargando canchas...</div>
               ) : (
-                <select
-                  value={canchaId}
-                  onChange={(e) => setCanchaId(Number(e.target.value))}
-                  className="w-full px-4 py-2 bg-background border border-borderColor rounded-lg text-textPrimary focus:outline-none focus:ring-2 focus:ring-accent"
-                >
+                <select value={canchaId} onChange={(e) => setCanchaId(Number(e.target.value))}
+                  className="w-full px-4 py-2 bg-background border border-borderColor rounded-lg text-textPrimary focus:outline-none focus:ring-2 focus:ring-accent">
                   {canchas.map((cancha) => (
-                    <option key={cancha.id} value={cancha.id}>
-                      {cancha.nombre}
-                    </option>
+                    <option key={cancha.id} value={cancha.id}>{cancha.nombre}</option>
                   ))}
                 </select>
               )}
             </div>
 
-            {/* Conflictos en tiempo real */}
+            {/* Estado de verificación */}
             {verificandoConflictos && (
               <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
                 <div className="flex items-center gap-2 text-sm text-blue-500">
@@ -269,47 +237,61 @@ export default function ModalCambiarHorario({
               </div>
             )}
 
-            {conflictos.length > 0 && !verificandoConflictos && (
-              <div className="p-4 bg-red-500/10 border-2 border-red-500/50 rounded-lg animate-pulse">
+            {/* Conflictos de cancha */}
+            {!verificandoConflictos && conflictosCancha.length > 0 && (
+              <div className="p-4 bg-red-500/10 border-2 border-red-500/50 rounded-lg">
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
                   <div className="flex-1">
-                    <h3 className="font-bold text-red-500 mb-2 text-lg">
-                      ⚠️ {conflictos.length} Conflicto{conflictos.length > 1 ? 's' : ''} Detectado{conflictos.length > 1 ? 's' : ''}
+                    <h3 className="font-bold text-red-500 mb-2">
+                      ⚠️ {conflictosCancha.length} Solapamiento{conflictosCancha.length > 1 ? 's' : ''} de cancha
                     </h3>
-                    <p className="text-sm text-red-400 mb-3 font-medium">
-                      Este horario se solapa con otros partidos en la misma cancha:
-                    </p>
                     <div className="space-y-2">
-                      {conflictos.map((conflicto, idx) => (
-                        <div
-                          key={idx}
-                          className="p-3 bg-background/80 rounded-lg border border-red-500/30"
-                        >
-                          <div className="font-medium text-textPrimary text-sm">
-                            {conflicto.pareja1} vs {conflicto.pareja2}
-                          </div>
+                      {conflictosCancha.map((c, idx) => (
+                        <div key={idx} className="p-3 bg-background/80 rounded-lg border border-red-500/30">
+                          <div className="font-medium text-textPrimary text-sm">{c.pareja1} vs {c.pareja2}</div>
                           <div className="text-red-400 text-xs mt-1 font-bold">
-                            🕐 {conflicto.fecha_hora} - {conflicto.cancha}
+                            🕐 {c.fecha_hora} - {c.cancha} {c.categoria ? `(${c.categoria})` : ''}
                           </div>
                         </div>
                       ))}
                     </div>
-                    <p className="text-xs text-red-400 mt-3 font-medium">
-                      💡 Selecciona otro horario o cancha para evitar solapamientos
-                    </p>
                   </div>
                 </div>
               </div>
             )}
 
-            {!verificandoConflictos && conflictos.length === 0 && fecha && hora && (
+            {/* Conflictos de descanso */}
+            {!verificandoConflictos && conflictosDescanso.length > 0 && (
+              <div className="p-4 bg-orange-500/10 border-2 border-orange-500/50 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-orange-500 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <h3 className="font-bold text-orange-500 mb-2">
+                      ⏱️ {conflictosDescanso.length} Conflicto{conflictosDescanso.length > 1 ? 's' : ''} de descanso (&lt;3h)
+                    </h3>
+                    <div className="space-y-2">
+                      {conflictosDescanso.map((c, idx) => (
+                        <div key={idx} className="p-3 bg-background/80 rounded-lg border border-orange-500/30">
+                          <div className="font-medium text-textPrimary text-sm">{c.pareja1} vs {c.pareja2}</div>
+                          <div className="text-orange-400 text-xs mt-1 font-bold">
+                            🕐 {c.fecha_hora} - {c.cancha} {c.categoria ? `(${c.categoria})` : ''}
+                          </div>
+                          <div className="text-orange-400 text-xs mt-0.5">{c.mensaje}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Sin conflictos */}
+            {!verificandoConflictos && conflictos !== null && conflictos.length === 0 && fecha && hora && (
               <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
                 <div className="flex items-center gap-2">
                   <CheckCircle className="w-4 h-4 text-green-500" />
-                  <span className="text-sm text-green-500 font-medium">
-                    ✓ Horario disponible - Sin conflictos
-                  </span>
+                  <span className="text-sm text-green-500 font-medium">✓ Horario disponible - Sin conflictos</span>
                 </div>
               </div>
             )}
@@ -317,20 +299,11 @@ export default function ModalCambiarHorario({
 
           {/* Footer */}
           <div className="flex gap-3 p-6 border-t border-borderColor">
-            <Button
-              variant="secondary"
-              onClick={onClose}
-              className="flex-1"
-              disabled={loading}
-            >
+            <Button variant="secondary" onClick={onClose} className="flex-1" disabled={loading}>
               Cancelar
             </Button>
-            <Button
-              variant="primary"
-              onClick={handleCambiarHorario}
-              className="flex-1"
-              disabled={loading || !fecha || !hora}
-            >
+            <Button variant="primary" onClick={handleCambiarHorario} className="flex-1"
+              disabled={loading || !fecha || !hora || verificandoConflictos}>
               {loading ? 'Cambiando...' : 'Cambiar Horario'}
             </Button>
           </div>

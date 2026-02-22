@@ -295,7 +295,12 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
       // Tomar los primeros 16 chars del ISO string (YYYY-MM-DDTHH:MM) sin convertir timezone
       setHorarioInput(partido.fecha_hora.slice(0, 16));
     } else {
-      setHorarioInput('');
+      // Predeterminar con la fecha de hoy (sin hora, para que el usuario solo elija la hora)
+      const hoy = new Date();
+      const yyyy = hoy.getFullYear();
+      const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+      const dd = String(hoy.getDate()).padStart(2, '0');
+      setHorarioInput(`${yyyy}-${mm}-${dd}T10:00`);
     }
   };
 
