@@ -2580,7 +2580,12 @@ def actualizar_horario_playoff(
     if body.fecha_hora:
         from datetime import datetime as dt
         try:
-            partido.fecha_hora = dt.fromisoformat(body.fecha_hora.replace('Z', '+00:00'))
+            # Parsear como hora local (sin timezone) — el organizador pone la hora Argentina
+            fecha_str = body.fecha_hora.replace('Z', '').replace('+00:00', '')
+            if 'T' in fecha_str:
+                partido.fecha_hora = dt.fromisoformat(fecha_str)
+            else:
+                partido.fecha_hora = dt.fromisoformat(fecha_str)
         except ValueError:
             raise HTTPException(status_code=400, detail="Formato de fecha inválido")
     else:

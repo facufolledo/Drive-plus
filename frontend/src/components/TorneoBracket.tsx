@@ -291,11 +291,9 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
 
   const abrirModalHorario = (partido: Partido) => {
     setModalHorario({ partido });
-    // Si ya tiene fecha_hora, pre-llenar el input en formato datetime-local
     if (partido.fecha_hora) {
-      const d = new Date(partido.fecha_hora);
-      const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
-      setHorarioInput(local.toISOString().slice(0, 16));
+      // Tomar los primeros 16 chars del ISO string (YYYY-MM-DDTHH:MM) sin convertir timezone
+      setHorarioInput(partido.fecha_hora.slice(0, 16));
     } else {
       setHorarioInput('');
     }
@@ -305,19 +303,28 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
     if (!modalHorario) return;
     setGuardandoHorario(true);
     try {
-      const fechaHora = horarioInput ? new Date(horarioInput).toISOString() : null;
+      // Enviar el datetime-local tal cual (hora local Argentina, sin convertir a UTC)
+      const fechaHora = horarioInput || null;
       await torneoService.actualizarHorarioPlayoff(torneoId, modalHorario.partido.id, fechaHora);
       setModalHorario(null);
       onResultadoCargado?.();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error al guardar horario:', err);
+      alert('Error al guardar horario: ' + (err?.response?.data?.detail || err?.message || 'Error desconocido'));
     } finally {
       setGuardandoHorario(false);
     }
   };
 
   const formatearFechaHora = (fechaHora: string) => {
-    const d = new Date(fechaHora);
+    // Parsear sin timezone — la hora guardada es hora local Argentina
+    const parts = fechaHora.replace('T', '-').replace(':', '-').split('-');
+    const year = parseInt(parts[0]);
+    const month = parseInt(parts[1]) - 1;
+    const day = parseInt(parts[2]);
+    const hour = parseInt(parts[3] || '0');
+    const min = parseInt(parts[4] || '0');
+    const d = new Date(year, month, day, hour, min);
     const dia = d.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
     const hora = d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
     return { dia, hora };
