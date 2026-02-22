@@ -566,6 +566,15 @@ class TorneoService {
     return response.data;
   }
 
+  async actualizarHorarioPlayoff(torneoId: number, partidoId: number, fechaHora: string | null): Promise<any> {
+    const response = await axios.put(
+      `${API_URL}/torneos/${torneoId}/partidos/${partidoId}/horario-playoff`,
+      { fecha_hora: fechaHora },
+      this.getAuthHeaders()
+    );
+    return response.data;
+  }
+
   async cargarResultadoPlayoff(torneoId: number, partidoId: number, resultado: any): Promise<any> {
     const response = await axios.post(
       `${API_URL}/torneos/${torneoId}/partidos/${partidoId}/resultado`,

@@ -2539,7 +2539,9 @@ def listar_todos_partidos_playoffs(
                 "resultado": p.resultado_padel,
                 "fase": p.fase,
                 "categoria_id": getattr(p, 'categoria_id', None),
-                "estado": p.estado
+                "estado": p.estado,
+                "fecha_hora": p.fecha_hora.isoformat() if p.fecha_hora else None,
+                "cancha_id": p.cancha_id,
             }
             for p in partidos
         ]
@@ -2549,6 +2551,43 @@ def listar_todos_partidos_playoffs(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+# ============================================
+# HORARIOS DE PLAYOFFS
+# ============================================
+
+class HorarioPlayoffUpdate(BaseModel):
+    fecha_hora: Optional[str] = None  # ISO string o null para quitar
+
+@router.put("/{torneo_id}/partidos/{partido_id}/horario-playoff")
+def actualizar_horario_playoff(
+    torneo_id: int,
+    partido_id: int,
+    body: HorarioPlayoffUpdate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user)
+):
+    """Actualizar fecha/hora de un partido de playoff. Solo organizadores."""
+    partido = db.query(Partido).filter(
+        Partido.id_partido == partido_id,
+        Partido.id_torneo == torneo_id,
+        Partido.fase != 'zona'
+    ).first()
+    if not partido:
+        raise HTTPException(status_code=404, detail="Partido de playoff no encontrado")
+
+    if body.fecha_hora:
+        from datetime import datetime as dt
+        try:
+            partido.fecha_hora = dt.fromisoformat(body.fecha_hora.replace('Z', '+00:00'))
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Formato de fecha inválido")
+    else:
+        partido.fecha_hora = None
+
+    db.commit()
+    return {"message": "Horario actualizado", "partido_id": partido_id, "fecha_hora": partido.fecha_hora.isoformat() if partido.fecha_hora else None}
 
 
 # ============================================

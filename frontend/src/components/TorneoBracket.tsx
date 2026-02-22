@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
-import { Trophy, Edit3, Crown, Star, Sparkles, FastForward, ArrowRightLeft, X } from 'lucide-react';
+import { Trophy, Edit3, Crown, Star, Sparkles, FastForward, ArrowRightLeft, X, Clock, Calendar } from 'lucide-react';
 import ModalCargarResultado from './ModalCargarResultado';
 import { AdminBadge, AdminId } from './AdminBadge';
 import torneoService from '../services/torneo.service';
@@ -18,6 +18,7 @@ interface Partido {
   fase: string;
   estado: string;
   numero_partido?: number;
+  fecha_hora?: string | null;
 }
 
 interface TorneoBracketProps {
@@ -44,6 +45,9 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
   const [intercambiandoCuadros, setIntercambiandoCuadros] = useState(false);
   const [svgSize, setSvgSize] = useState({ width: 0, height: 0 });
   const [lines, setLines] = useState<JSX.Element[]>([]);
+  const [modalHorario, setModalHorario] = useState<{ partido: Partido } | null>(null);
+  const [horarioInput, setHorarioInput] = useState('');
+  const [guardandoHorario, setGuardandoHorario] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const matchRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
@@ -285,6 +289,40 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
     setModoIntercambiarCuadros(false);
   };
 
+  const abrirModalHorario = (partido: Partido) => {
+    setModalHorario({ partido });
+    // Si ya tiene fecha_hora, pre-llenar el input en formato datetime-local
+    if (partido.fecha_hora) {
+      const d = new Date(partido.fecha_hora);
+      const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+      setHorarioInput(local.toISOString().slice(0, 16));
+    } else {
+      setHorarioInput('');
+    }
+  };
+
+  const guardarHorario = async () => {
+    if (!modalHorario) return;
+    setGuardandoHorario(true);
+    try {
+      const fechaHora = horarioInput ? new Date(horarioInput).toISOString() : null;
+      await torneoService.actualizarHorarioPlayoff(torneoId, modalHorario.partido.id, fechaHora);
+      setModalHorario(null);
+      onResultadoCargado?.();
+    } catch (err) {
+      console.error('Error al guardar horario:', err);
+    } finally {
+      setGuardandoHorario(false);
+    }
+  };
+
+  const formatearFechaHora = (fechaHora: string) => {
+    const d = new Date(fechaHora);
+    const dia = d.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
+    const hora = d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+    return { dia, hora };
+  };
+
   // PartidoBox component
   const PartidoBox = ({ partido, esFinal = false, faseNombre }: { partido: Partido; esFinal?: boolean; faseNombre?: string }) => {
     const esBye = partido.estado === 'bye';
@@ -340,6 +378,28 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
                     : 'border-primary/30'
         } ${puedeSeleccionarCuadro ? 'cursor-pointer hover:border-primary/60' : ''}`}
       >
+        {/* Badge de horario si tiene */}
+        {partido.fecha_hora && (() => {
+          const { dia, hora } = formatearFechaHora(partido.fecha_hora!);
+          return (
+            <div className="flex items-center gap-1.5 px-2 py-1 bg-primary/10 border-b border-primary/20">
+              <Calendar size={10} className="text-primary flex-shrink-0" />
+              <span className="text-[10px] font-medium text-primary">{dia}</span>
+              <Clock size={10} className="text-primary flex-shrink-0" />
+              <span className="text-[10px] font-bold text-primary">{hora}</span>
+              {esOrganizador && !modoIntercambiarActivo && !modoIntercambiarCuadros && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); abrirModalHorario(partido); }}
+                  className="ml-auto p-0.5 hover:bg-primary/20 rounded transition-colors"
+                  title="Editar horario"
+                >
+                  <Edit3 size={9} className="text-primary" />
+                </button>
+              )}
+            </div>
+          );
+        })()}
         {/* Fila pareja 1 */}
         <div
           className={`flex items-center gap-1 px-3 py-2.5 border-b border-cardBorder ${ganadorA ? 'bg-green-500/20' : 'bg-card'}`}
@@ -394,12 +454,32 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
         </div>
         
         {puedeCargarResultado && !modoIntercambiarActivo && !modoIntercambiarCuadros ? (
+          <div className="flex border-t border-accent/20">
+            <button
+              onClick={() => abrirModalResultado(partido)}
+              className="flex-1 py-2 md:py-1.5 bg-gradient-to-r from-accent/30 to-yellow-500/30 hover:from-accent/50 hover:to-yellow-500/50 active:from-accent/60 active:to-yellow-500/60 transition-all flex items-center justify-center gap-1 min-h-[44px] md:min-h-0"
+            >
+              <Edit3 size={12} className="text-accent" />
+              <span className="text-xs md:text-[10px] font-bold text-accent">Resultado</span>
+            </button>
+            {!partido.fecha_hora && (
+              <button
+                onClick={(e) => { e.stopPropagation(); abrirModalHorario(partido); }}
+                className="px-3 py-2 md:py-1.5 bg-primary/10 hover:bg-primary/20 active:bg-primary/30 transition-all flex items-center justify-center gap-1 border-l border-accent/20 min-h-[44px] md:min-h-0"
+                title="Asignar horario"
+              >
+                <Clock size={12} className="text-primary" />
+              </button>
+            )}
+          </div>
+        ) : esOrganizador && !partidoFinalizado && !esBye && !modoIntercambiarActivo && !modoIntercambiarCuadros && !partido.fecha_hora && partido.id > 0 ? (
           <button
-            onClick={() => abrirModalResultado(partido)}
-            className="w-full py-2 md:py-1.5 bg-gradient-to-r from-accent/30 to-yellow-500/30 hover:from-accent/50 hover:to-yellow-500/50 active:from-accent/60 active:to-yellow-500/60 transition-all flex items-center justify-center gap-1 border-t border-accent/20 min-h-[44px] md:min-h-0"
+            onClick={(e) => { e.stopPropagation(); abrirModalHorario(partido); }}
+            className="w-full py-1.5 bg-primary/5 hover:bg-primary/10 transition-all flex items-center justify-center gap-1 border-t border-primary/10"
+            title="Asignar horario"
           >
-            <Edit3 size={12} className="text-accent" />
-            <span className="text-xs md:text-[10px] font-bold text-accent">Cargar Resultado</span>
+            <Clock size={10} className="text-primary/60" />
+            <span className="text-[10px] text-primary/60">Horario</span>
           </button>
         ) : partidoFinalizado ? (
           <div className="py-2 md:py-1.5 bg-green-500/10 flex items-center justify-center gap-1 border-t border-green-500/20">
@@ -426,16 +506,29 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
 
 
   // Calcular posición vertical para centrar cada fase
+  // Cada fase debe quedar centrada respecto a los pares de la fase anterior
+  const alturaPartido = 95; // altura aproximada de cada partido box
+  const gapBase = 16;
+
+  // Gap real entre partidos de cada fase: para faseIdx=0 es gapBase,
+  // para fases siguientes se calcula para que queden centrados
+  const calcularGap = (faseIdx: number): number => {
+    if (faseIdx === 0) return gapBase;
+    // El gap de la fase N debe ser tal que cada partido quede centrado
+    // entre el par correspondiente de la fase N-1
+    // gap(N) = 2 * gap(N-1) + alturaPartido + gapBase - gapBase... 
+    // Fórmula: gap(N) = alturaPartido + 2 * gap(N-1) + alturaPartido - alturaPartido
+    // Simplificado: el espacio total de un par en fase anterior = alturaPartido + gap(N-1) + alturaPartido
+    // El gap de fase N = espacio de un par anterior - alturaPartido
+    const gapAnterior = calcularGap(faseIdx - 1);
+    return alturaPartido + gapAnterior;
+  };
+
   const calcularPaddingTop = (faseIdx: number, _numPartidos: number) => {
     if (faseIdx === 0) return 0;
-    // Cada ronda siguiente debe estar centrada entre los partidos de la anterior
-    // El primer partido de la ronda N debe estar centrado entre partidos 0 y 1 de ronda N-1
-    const alturaPartido = 95; // altura aproximada de cada partido
-    const gapBase = 16;
-    const multiplicadorAnterior = Math.pow(2, faseIdx - 1);
-    const espacioAnterior = (alturaPartido + gapBase) * multiplicadorAnterior;
-    // Centrar: mitad del espacio entre dos partidos de la ronda anterior
-    return espacioAnterior / 2;
+    // El padding top es la mitad de (alturaPartido + gap de la fase anterior)
+    const gapAnterior = calcularGap(faseIdx - 1);
+    return (alturaPartido + gapAnterior) / 2;
   };
 
   return (
@@ -579,8 +672,7 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
           <div className="relative flex items-start gap-16" style={{ zIndex: 1 }}>
             {fasesActivas.map(([nombre, partidosFase], faseIdx) => {
               const esFinal = nombre === 'final';
-              const multiplicador = Math.pow(2, faseIdx);
-              const gap = 16 * multiplicador;
+              const gap = calcularGap(faseIdx);
               const paddingTop = calcularPaddingTop(faseIdx, partidosFase.length);
 
               return (
@@ -654,6 +746,52 @@ export default function TorneoBracket({ partidos, torneoId, esOrganizador, onRes
           />,
           document.body
         )}
+
+      {/* Modal horario */}
+      {modalHorario && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setModalHorario(null)}>
+          <div className="bg-card rounded-xl p-5 w-full max-w-sm shadow-xl border border-cardBorder" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-2 mb-4">
+              <Clock size={18} className="text-primary" />
+              <h3 className="text-base font-bold text-textPrimary">Horario del partido</h3>
+            </div>
+            <div className="mb-2 text-xs text-textSecondary">
+              {modalHorario.partido.pareja1_nombre || 'TBD'} vs {modalHorario.partido.pareja2_nombre || 'TBD'}
+            </div>
+            <input
+              type="datetime-local"
+              value={horarioInput}
+              onChange={e => setHorarioInput(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-lg bg-background border border-cardBorder text-textPrimary text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 mb-4"
+            />
+            <div className="flex gap-2">
+              {horarioInput && (
+                <button
+                  onClick={() => { setHorarioInput(''); }}
+                  className="px-3 py-2 rounded-lg text-xs font-bold text-red-500 bg-red-500/10 hover:bg-red-500/20 transition-colors"
+                >
+                  Quitar
+                </button>
+              )}
+              <div className="flex-1" />
+              <button
+                onClick={() => setModalHorario(null)}
+                className="px-4 py-2 rounded-lg text-xs font-bold text-textSecondary bg-background hover:bg-cardBorder transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={guardarHorario}
+                disabled={guardandoHorario}
+                className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-primary hover:bg-primary/80 transition-colors disabled:opacity-50"
+              >
+                {guardandoHorario ? 'Guardando...' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       </div>
   );

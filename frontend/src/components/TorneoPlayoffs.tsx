@@ -109,14 +109,9 @@ export default function TorneoPlayoffs({ torneoId, esOrganizador }: TorneoPlayof
     cargarPlayoffs();
   }, [cargarPlayoffs, categoriaFiltro]);
 
-  // Auto-refresh cada 30 segundos para ver cambios en tiempo real
-  useEffect(() => {
-    const interval = setInterval(() => {
-      cargarPlayoffs(true);
-    }, 30000);
-    
-    return () => clearInterval(interval);
-  }, [cargarPlayoffs]);
+  // Auto-refresh removido: causaba que el modal de cargar resultado
+  // se cerrara al re-renderizar. El refresh ocurre automáticamente
+  // después de cargar un resultado (handleResultadoCargado) o manualmente.
 
   // Función para refrescar manualmente
   const refrescarPlayoffs = () => {
