@@ -80,29 +80,50 @@ class TorneoService:
         genero = torneo_data.genero if torneo_data.genero in ['masculino', 'femenino', 'mixto'] else 'masculino'
         
         # Procesar horarios disponibles
-        # El frontend puede enviar {semana: [], finDeSemana: []} o un array directo
-        horarios_procesados = []
-        horarios_raw = getattr(torneo_data, 'horarios_disponibles', [])
+        # El frontend puede enviar:
+        # 1. Formato por día: {lunes: {inicio, fin}, sabado: {inicio, fin}, ...} (nuevo, preferido)
+        # 2. Formato antiguo: {semana: [{desde, hasta}], finDeSemana: [{desde, hasta}]}
+        # 3. Array directo
+        horarios_procesados = {}
+        horarios_raw = getattr(torneo_data, 'horarios_disponibles', None)
+        
+        dias_validos = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo']
         
         if isinstance(horarios_raw, dict):
-            # Formato del frontend: {semana: [{desde, hasta}], finDeSemana: [{desde, hasta}]}
-            if 'semana' in horarios_raw:
-                for h in horarios_raw['semana']:
-                    horarios_procesados.append({
-                        'dias': ['lunes', 'martes', 'miercoles', 'jueves'],
-                        'horaInicio': h.get('desde', '09:00'),
-                        'horaFin': h.get('hasta', '23:00')
-                    })
-            if 'finDeSemana' in horarios_raw:
-                for h in horarios_raw['finDeSemana']:
-                    horarios_procesados.append({
-                        'dias': ['viernes', 'sabado', 'domingo'],
-                        'horaInicio': h.get('desde', '09:00'),
-                        'horaFin': h.get('hasta', '23:00')
-                    })
-        elif isinstance(horarios_raw, list):
-            # Ya viene en formato correcto
-            horarios_procesados = horarios_raw
+            # Verificar si es formato por día (nuevo)
+            tiene_dias = any(k in dias_validos for k in horarios_raw.keys())
+            if tiene_dias:
+                # Formato nuevo: guardar directo
+                horarios_procesados = {k: v for k, v in horarios_raw.items() if k in dias_validos}
+            else:
+                # Formato antiguo: {semana: [{desde, hasta}], finDeSemana: [{desde, hasta}]}
+                if 'semana' in horarios_raw and horarios_raw['semana']:
+                    h = horarios_raw['semana'][0]
+                    for dia in ['lunes', 'martes', 'miercoles', 'jueves', 'viernes']:
+                        horarios_procesados[dia] = {
+                            'inicio': h.get('desde', '09:00'),
+                            'fin': h.get('hasta', '23:00')
+                        }
+                if 'finDeSemana' in horarios_raw and horarios_raw['finDeSemana']:
+                    h = horarios_raw['finDeSemana'][0]
+                    for dia in ['sabado', 'domingo']:
+                        horarios_procesados[dia] = {
+                            'inicio': h.get('desde', '09:00'),
+                            'fin': h.get('hasta', '23:00')
+                        }
+        elif isinstance(horarios_raw, list) and horarios_raw:
+            # Array directo legacy - convertir a formato por día
+            for item in horarios_raw:
+                if isinstance(item, dict) and 'dias' in item:
+                    for dia in item['dias']:
+                        if dia in dias_validos:
+                            horarios_procesados[dia] = {
+                                'inicio': item.get('horaInicio', '09:00'),
+                                'fin': item.get('horaFin', '23:00')
+                            }
+        
+        if not horarios_procesados:
+            horarios_procesados = None
         
         # Crear torneo
         torneo = Torneo(

@@ -144,7 +144,31 @@ export default function ModalCrearTorneo({ isOpen, onClose }: ModalCrearTorneoPr
         titular_cuenta: formData.requierePago && formData.titular ? formData.titular.trim() : undefined,
         banco: formData.requierePago && formData.banco ? formData.banco.trim() : undefined,
         telefono_contacto: formData.requierePago && formData.telefono ? formData.telefono.trim() : undefined,
-        horarios_disponibles: horariosDisponibles,
+        horarios_disponibles: (() => {
+          // Convertir formato {semana: [{desde, hasta}], finDeSemana: [{desde, hasta}]}
+          // a formato por día: {lunes: {inicio, fin}, martes: {inicio, fin}, ...}
+          const resultado: Record<string, {inicio: string, fin: string}> = {};
+          const diasSemana = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes'];
+          const diasFinDeSemana = ['sabado', 'domingo'];
+          
+          // Tomar el primer horario de semana (el principal)
+          const horarioSemana = horariosDisponibles.semana.find(h => h.desde && h.hasta);
+          if (horarioSemana) {
+            diasSemana.forEach(dia => {
+              resultado[dia] = { inicio: horarioSemana.desde, fin: horarioSemana.hasta };
+            });
+          }
+          
+          // Tomar el primer horario de fin de semana
+          const horarioFinde = horariosDisponibles.finDeSemana.find(h => h.desde && h.hasta);
+          if (horarioFinde) {
+            diasFinDeSemana.forEach(dia => {
+              resultado[dia] = { inicio: horarioFinde.desde, fin: horarioFinde.hasta };
+            });
+          }
+          
+          return Object.keys(resultado).length > 0 ? resultado : undefined;
+        })(),
         codigo: formData.codigo?.trim() || undefined,
         reglas_json: {
           puntos_victoria: 3,
