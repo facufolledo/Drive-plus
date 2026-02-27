@@ -424,6 +424,9 @@ class TorneoFixtureGlobalService:
                 for franja in franjas:
                     hora_desde = franja.get('desde', '08:00')
                     hora_hasta = franja.get('hasta', '23:00')
+                    # Fix: 00:00 significa fin del día, tratar como 23:59
+                    if hora_hasta == '00:00':
+                        hora_hasta = '23:59'
                     
                     hora_actual = datetime.strptime(hora_desde, '%H:%M')
                     hora_limite = datetime.strptime(hora_hasta, '%H:%M')
@@ -447,6 +450,9 @@ class TorneoFixtureGlobalService:
             if horarios_dia and isinstance(horarios_dia, dict):
                 hora_desde = horarios_dia.get('inicio') or horarios_dia.get('desde', '08:00')
                 hora_hasta = horarios_dia.get('fin') or horarios_dia.get('hasta', '23:00')
+                # Fix: 00:00 significa fin del día, tratar como 23:59
+                if hora_hasta == '00:00':
+                    hora_hasta = '23:59'
                 
                 hora_actual = datetime.strptime(hora_desde, '%H:%M')
                 hora_limite = datetime.strptime(hora_hasta, '%H:%M')
