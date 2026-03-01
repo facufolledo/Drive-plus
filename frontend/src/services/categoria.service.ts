@@ -1,4 +1,4 @@
-import api from './api';
+import { apiService } from './api';
 
 export interface Categoria {
   id_categoria: number;
@@ -23,10 +23,10 @@ class CategoriaService {
     }
 
     try {
-      const response = await api.get<Categoria[]>('/categorias');
-      this.categoriasCache = response.data;
+      const response = await apiService.get<Categoria[]>('/categorias');
+      this.categoriasCache = response;
       this.cacheTimestamp = now;
-      return response.data;
+      return response;
     } catch (error) {
       console.error('Error al cargar categorías:', error);
       // Si falla, devolver categorías por defecto
