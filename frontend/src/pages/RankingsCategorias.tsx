@@ -6,7 +6,7 @@ import RatingProgressBar from '../components/RatingProgressBar';
 import { apiService } from '../services/api';
 import { logger } from '../utils/logger';
 
-type Categoria = '8va' | '7ma' | '6ta' | '5ta' | '4ta' | 'Libre';
+type Categoria = '8va' | '7ma' | '6ta' | '5ta' | '4ta' | '3ra';
 type Genero = 'masculino' | 'femenino' | 'mixto';
 
 interface Jugador {
@@ -35,7 +35,7 @@ export default function RankingsCategorias() {
     '6ta': 3,
     '5ta': 4,
     '4ta': 5,
-    'Libre': 6,
+    '3ra': 6,
   };
 
   // Cargar jugadores cuando cambie categoría o género
@@ -118,8 +118,8 @@ export default function RankingsCategorias() {
       icon: Trophy 
     },
     { 
-      id: 'Libre', 
-      nombre: 'Libre', 
+      id: '3ra', 
+      nombre: '3ra', 
       rango: 'Profesional', 
       color: 'from-purple-400/40 to-pink-500/40',
       bgColor: 'bg-purple-500/20',

@@ -21,7 +21,7 @@ const CATEGORIAS = [
   { id: 3, nombre: '6ta', descripcion: 'Mejor dominio y estrategia', ratingMin: 1200, ratingMax: 1399, color: 'from-green-500 to-green-600' },
   { id: 4, nombre: '5ta', descripción: 'Buenos jugadores, constancia', ratingMin: 1400, ratingMax: 1599, color: 'from-yellow-500 to-yellow-600' },
   { id: 5, nombre: '4ta', descripcion: 'Muy buenos, técnica + estrategia', ratingMin: 1600, ratingMax: 1799, color: 'from-orange-500 to-orange-600' },
-  { id: 6, nombre: 'Libre', descripcion: 'Élite local (top provincia)', ratingMin: 1800, ratingMax: 9999, color: 'from-purple-500 to-pink-500' },
+  { id: 6, nombre: '3ra', descripcion: 'Élite local (top provincia)', ratingMin: 1800, ratingMax: 9999, color: 'from-purple-500 to-pink-500' },
 ];
 
 function getCategoriaInfo(rating: number) {

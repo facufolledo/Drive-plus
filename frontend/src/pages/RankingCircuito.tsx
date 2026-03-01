@@ -10,8 +10,7 @@ import { useDebounce } from '../hooks/useDebounce';
 import circuitoService, { Circuito, RankingCircuitoItem, CircuitoInfo } from '../services/circuito.service';
 import { storage } from '../config/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-
-const CATEGORIAS_FILTRO = ['Todas', 'Principiante', '8va', '7ma', '6ta', '5ta', '4ta', 'Libre'];
+import { useCategorias } from '../hooks/useCategorias';
 
 const FASE_LABELS: Record<string, string> = {
   campeon: '🏆 Campeón',
@@ -49,6 +48,7 @@ export default function RankingCircuito() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { codigo: codigoRuta } = useParams<{ codigo: string }>();
+  const { getCategoriasNombres } = useCategorias();
   
   // useAuth puede no estar disponible si la ruta es pública (fuera de AuthProvider)
   let usuario: any = null;
@@ -310,7 +310,7 @@ export default function RankingCircuito() {
               <Filter size={14} />
               <span className="text-xs md:text-sm font-bold">Categoría:</span>
             </div>
-            {CATEGORIAS_FILTRO.map(cat => (
+            {['Todas', ...getCategoriasNombres()].map(cat => (
               <Button key={cat} variant={filtroCategoria === cat ? 'primary' : 'secondary'} onClick={() => setFiltroCategoria(cat)} className="text-[10px] md:text-sm px-2 md:px-3 py-1 md:py-1.5">
                 {cat}
               </Button>

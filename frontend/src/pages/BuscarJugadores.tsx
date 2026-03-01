@@ -102,7 +102,7 @@ export default function BuscarJugadores() {
   };
 
   const getCategoriaByRating = (rating: number): { nombre: string; color: string } => {
-    if (rating >= 1800) return { nombre: 'Libre', color: 'from-purple-500 to-pink-500' };
+    if (rating >= 1800) return { nombre: '3ra', color: 'from-purple-500 to-pink-500' };
     if (rating >= 1600) return { nombre: '4ta', color: 'from-orange-500 to-orange-600' };
     if (rating >= 1400) return { nombre: '5ta', color: 'from-yellow-500 to-yellow-600' };
     if (rating >= 1200) return { nombre: '6ta', color: 'from-green-500 to-green-600' };

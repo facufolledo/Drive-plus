@@ -111,7 +111,7 @@ async def get_jugadores_por_categoria(
             3: "6ta",
             4: "5ta",
             5: "4ta",
-            6: "Libre"
+            6: "3ra"
         }
         
         nombre_categoria = categoria_nombres.get(categoria_id)

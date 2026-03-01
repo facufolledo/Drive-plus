@@ -133,7 +133,7 @@ class EloConfig:
         "6ta": {"win": 60, "loss": -30},            # Aumentado de 50 a 60
         "5ta": {"win": 50, "loss": -25},            # Mantenido en 50
         "4ta": {"win": 50, "loss": -25},            # Mantenido en 50
-        "Libre": {"win": 40, "loss": -20}           # Mantenido en 40
+        "3ra": {"win": 40, "loss": -20}             # Mantenido en 40
     }
     
     # === NUEVO: INACTIVIDAD ===
@@ -331,7 +331,7 @@ class EloConfig:
         """
         # Determinar categoría por rating
         if team_rating >= 1800:
-            category = "Libre"
+            category = "3ra"
         elif team_rating >= 1600:
             category = "4ta"
         elif team_rating >= 1400:

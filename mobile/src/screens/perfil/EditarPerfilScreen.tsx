@@ -5,7 +5,7 @@ import { Input } from '../../components/common/Input';
 import { useAuthStore } from '../../store/authStore';
 import { authService } from '../../services/auth.service';
 
-const CATEGORIAS = ['8va', '7ma', '6ta', '5ta', '4ta', 'Libre'];
+const CATEGORIAS = ['8va', '7ma', '6ta', '5ta', '4ta', '3ra'];
 const MANOS = ['derecha', 'izquierda', 'ambas'];
 const POSICIONES = ['drive', 'reves', 'indiferente'];
 

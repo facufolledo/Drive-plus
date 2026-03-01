@@ -7,12 +7,12 @@ import Input from '../components/Input';
 import Card from '../components/Card';
 import { PerfilCompleto } from '../services/auth.service';
 import { useAuth } from '../context/AuthContext';
-
-const CATEGORIAS = ['Principiante', '8va', '7ma', '6ta', '5ta', '4ta', 'Libre'];
+import { useCategorias } from '../hooks/useCategorias';
 
 export default function CompletarPerfil() {
   const navigate = useNavigate();
   const { firebaseUser, completeProfile, logout } = useAuth();
+  const { getCategoriasNombres } = useCategorias();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   // Polling para verificar si el email fue verificado
@@ -226,7 +226,7 @@ export default function CompletarPerfil() {
                   Categoría Inicial *
                 </label>
                 <div className="grid grid-cols-3 md:grid-cols-6 gap-1.5 md:gap-2">
-                  {CATEGORIAS.map((cat) => (
+                  {getCategoriasNombres().map((cat) => (
                     <motion.button
                       key={cat}
                       type="button"

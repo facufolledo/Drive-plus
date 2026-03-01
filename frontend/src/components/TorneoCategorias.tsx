@@ -17,7 +17,7 @@ const GENEROS = [
   { value: 'mixto', label: 'Mixto' },
 ];
 
-const CATEGORIAS_SUGERIDAS = ['8va', '7ma', '6ta', '5ta', '4ta', '3ra', '2da', '1ra', 'Libre'];
+const CATEGORIAS_SUGERIDAS = ['8va', '7ma', '6ta', '5ta', '4ta', '3ra', '2da', '1ra'];
 
 export default function TorneoCategorias({ torneoId, esOrganizador, onCategoriaSeleccionada }: TorneoCategoriasProps) {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
@@ -291,7 +291,7 @@ export default function TorneoCategorias({ torneoId, esOrganizador, onCategoriaS
                 type="text"
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
-                placeholder="Ej: 8va, 6ta, Libre"
+                placeholder="Ej: 8va, 6ta, 3ra"
                 className="w-full px-4 py-3 bg-background border border-cardBorder rounded-lg text-textPrimary"
               />
               {/* Sugerencias */}

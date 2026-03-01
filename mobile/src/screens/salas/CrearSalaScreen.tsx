@@ -4,7 +4,7 @@ import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
 import { salaService } from '../../services/sala.service';
 
-const CATEGORIAS = ['8va', '7ma', '6ta', '5ta', '4ta', 'Libre'];
+const CATEGORIAS = ['8va', '7ma', '6ta', '5ta', '4ta', '3ra'];
 const TIPOS_JUEGO = ['singles', 'dobles', 'mixto'];
 
 export const CrearSalaScreen = ({ navigation }: any) => {

@@ -15,7 +15,7 @@ const getCategoriaColor = (rating: number) => {
   if (rating < 1300) return { from: '#FFD700', to: '#FFA500', name: '6ta' };
   if (rating < 1500) return { from: '#E5E4E2', to: '#B0B0B0', name: '5ta' };
   if (rating < 1700) return { from: '#B9F2FF', to: '#00CED1', name: '4ta' };
-  return { from: '#9B59B6', to: '#E91E63', name: 'Libre' };
+  return { from: '#9B59B6', to: '#E91E63', name: '3ra' };
 };
 
 const getNextCategoriaThreshold = (rating: number) => {

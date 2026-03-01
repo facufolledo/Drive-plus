@@ -23,7 +23,7 @@ class CompletarPerfilRequest(BaseModel):
     dni: str
     fecha_nacimiento: str  # formato: YYYY-MM-DD
     genero: str  # 'masculino' o 'femenino'
-    categoria_inicial: str  # '8va', '7ma', '6ta', '5ta', '4ta', 'Libre'
+    categoria_inicial: str  # '8va', '7ma', '6ta', '5ta', '4ta', '3ra'
     mano_habil: Optional[str] = None  # 'derecha' o 'zurda'
     posicion_preferida: Optional[str] = None  # 'drive', 'reves', 'indiferente'
     telefono: Optional[str] = None

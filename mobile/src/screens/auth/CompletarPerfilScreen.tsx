@@ -5,7 +5,7 @@ import { Input } from '../../components/common/Input';
 import { useAuthStore } from '../../store/authStore';
 import { authService } from '../../services/auth.service';
 
-const CATEGORIAS = ['8va', '7ma', '6ta', '5ta', '4ta', 'Libre'];
+const CATEGORIAS = ['8va', '7ma', '6ta', '5ta', '4ta', '3ra'];
 
 export const CompletarPerfilScreen = ({ navigation }: any) => {
   const [loading, setLoading] = useState(false);

@@ -7,8 +7,11 @@ import Button from '../components/Button';
 import { torneoService, Torneo } from '../services/torneo.service';
 import { useAuth } from '../context/AuthContext';
 
+import { useCategorias } from '../hooks/useCategorias';
+
 export default function TorneosNuevo() {
   const navigate = useNavigate();
+  const { getCategoriasNombres } = useCategorias();
   const { usuario } = useAuth();
   const [torneos, setTorneos] = useState<Torneo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -118,7 +121,7 @@ export default function TorneosNuevo() {
               <span className="text-xs md:text-sm font-bold text-textSecondary">Categoría:</span>
             </div>
             <div className="flex flex-wrap gap-1 md:gap-2">
-              {['todos', 'Principiante', '8va', '7ma', '6ta', '5ta', '4ta', 'Libre'].map((cat) => (
+              {['todos', ...getCategoriasNombres()].map((cat) => (
                 <Button
                   key={cat}
                   variant={filtroCategoria === cat ? 'primary' : 'secondary'}

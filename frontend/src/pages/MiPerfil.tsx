@@ -52,8 +52,11 @@ interface Partido {
   historial_rating?: HistorialRating;
 }
 
+import { useCategorias } from '../hooks/useCategorias';
+
 export default function MiPerfil() {
   const { usuario } = useAuth();
+  const { getCategoriaByRating } = useCategorias();
   const [filtro, setFiltro] = useState<'todos' | 'torneos' | 'amistosos'>('todos');
   const [mostrarTodos, setMostrarTodos] = useState(false);
   const [partidos, setPartidos] = useState<Partido[]>([]);
@@ -90,7 +93,7 @@ export default function MiPerfil() {
     // 3. Fallback: derivar del rating cuando no tiene categoría asignada
     if (usuario?.rating != null) {
       const r = usuario.rating;
-      if (r >= 1800) return 'Libre';
+      if (r >= 1800) return '3ra';
       if (r >= 1600) return '4ta';
       if (r >= 1400) return '5ta';
       if (r >= 1200) return '6ta';
@@ -103,13 +106,7 @@ export default function MiPerfil() {
 
   // Función para obtener categoría según rating
   const obtenerCategoriaPorRating = (rating: number): string => {
-    if (rating >= 1800) return 'Libre';
-    if (rating >= 1600) return '4ta';
-    if (rating >= 1400) return '5ta';
-    if (rating >= 1200) return '6ta';
-    if (rating >= 1000) return '7ma';
-    if (rating >= 500) return '8va';
-    return 'Principiante';
+    return getCategoriaByRating(rating);
   };
 
   // Función para detectar cambio de categoría
@@ -121,7 +118,7 @@ export default function MiPerfil() {
     
     if (catAnterior !== catNueva) {
       // Determinar si es ascenso o descenso
-      const categorias = ['Principiante', '8va', '7ma', '6ta', '5ta', '4ta', 'Libre'];
+      const categorias = ['Principiante', '8va', '7ma', '6ta', '5ta', '4ta', '3ra'];
       const indexAnterior = categorias.indexOf(catAnterior);
       const indexNueva = categorias.indexOf(catNueva);
       

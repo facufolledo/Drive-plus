@@ -27,9 +27,12 @@ import { apiService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { clientLogger } from '../utils/clientLogger';
 
+import { useCategorias } from '../hooks/useCategorias';
+
 export default function PerfilPublico() {
   const { username } = useParams<{ username: string }>();
   const navigate = useNavigate();
+  const { getCategoriaByRating } = useCategorias();
   const { usuario: usuarioActual } = useAuth();
   
   const [perfil, setPerfil] = useState<PerfilPublicoType | null>(null);
@@ -71,7 +74,7 @@ export default function PerfilPublico() {
     // 3. Fallback: derivar del rating cuando el usuario no tiene categoría asignada
     if (perfil?.rating != null) {
       const r = perfil.rating;
-      if (r >= 1800) return 'Libre';
+      if (r >= 1800) return '3ra';
       if (r >= 1600) return '4ta';
       if (r >= 1400) return '5ta';
       if (r >= 1200) return '6ta';
@@ -84,13 +87,7 @@ export default function PerfilPublico() {
 
   // Función para obtener categoría según rating
   const obtenerCategoriaPorRating = (rating: number): string => {
-    if (rating >= 1800) return 'Libre';
-    if (rating >= 1600) return '4ta';
-    if (rating >= 1400) return '5ta';
-    if (rating >= 1200) return '6ta';
-    if (rating >= 1000) return '7ma';
-    if (rating >= 500) return '8va';
-    return 'Principiante';
+    return getCategoriaByRating(rating);
   };
 
   // Función para detectar cambio de categoría
@@ -102,7 +99,7 @@ export default function PerfilPublico() {
     
     if (catAnterior !== catNueva) {
       // Determinar si es ascenso o descenso
-      const categorias = ['Principiante', '8va', '7ma', '6ta', '5ta', '4ta', 'Libre'];
+      const categorias = ['Principiante', '8va', '7ma', '6ta', '5ta', '4ta', '3ra'];
       const indexAnterior = categorias.indexOf(catAnterior);
       const indexNueva = categorias.indexOf(catNueva);
       

@@ -847,9 +847,9 @@ class EloService:
             str: Nombre de la categoría
         """
         if sexo == "femenino":
-            # Categorías femeninas: Principiante, 8va, 7ma, 6ta, 5ta, Libre
+            # Categorías femeninas: Principiante, 8va, 7ma, 6ta, 5ta, 3ra
             if rating >= 1600:
-                return "Libre"
+                return "3ra"
             elif rating >= 1400:
                 return "5ta"
             elif rating >= 1200:
@@ -861,9 +861,9 @@ class EloService:
             else:
                 return "Principiante"
         else:
-            # Categorías masculinas: Principiante, 8va, 7ma, 6ta, 5ta, 4ta, Libre
+            # Categorías masculinas: Principiante, 8va, 7ma, 6ta, 5ta, 4ta, 3ra
             if rating >= 1800:
-                return "Libre"
+                return "3ra"
             elif rating >= 1600:
                 return "4ta"
             elif rating >= 1400:

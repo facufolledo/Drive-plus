@@ -4,7 +4,7 @@ import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
 import { torneoService } from '../../services/torneo.service';
 
-const CATEGORIAS = ['8va', '7ma', '6ta', '5ta', '4ta', 'Libre'];
+const CATEGORIAS = ['8va', '7ma', '6ta', '5ta', '4ta', '3ra'];
 const FORMATOS = ['eliminacion_simple', 'eliminacion_doble', 'round_robin', 'grupos'];
 const GENEROS = ['masculino', 'femenino', 'mixto'];
 
