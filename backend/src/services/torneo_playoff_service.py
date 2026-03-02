@@ -818,6 +818,12 @@ class TorneoPlayoffService:
     def _es_organizador(db: Session, torneo_id: int, user_id: int) -> bool:
         """Verifica si un usuario es organizador de un torneo"""
         from ..models.torneo_models import TorneoOrganizador
+        from ..models.driveplus_models import Usuario
+        
+        # Verificar si es administrador global
+        usuario = db.query(Usuario).filter(Usuario.id_usuario == user_id).first()
+        if usuario and getattr(usuario, 'es_administrador', False):
+            return True
         
         torneo = db.query(Torneo).filter(Torneo.id == torneo_id).first()
         if torneo and torneo.creado_por == user_id:

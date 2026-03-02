@@ -26,12 +26,19 @@ class TorneoService:
     @staticmethod
     def es_organizador_torneo(db: Session, torneo_id: int, user_id: int) -> bool:
         """Verifica si un usuario es organizador de un torneo específico"""
-        # Primero verificar si es el creador del torneo
+        from ..models.driveplus_models import Usuario
+        
+        # Verificar si es administrador global
+        usuario = db.query(Usuario).filter(Usuario.id_usuario == user_id).first()
+        if usuario and getattr(usuario, 'es_administrador', False):
+            return True
+        
+        # Verificar si es el creador del torneo
         torneo = db.query(Torneo).filter(Torneo.id == torneo_id).first()
         if torneo and torneo.creado_por == user_id:
             return True
         
-        # Luego verificar en la tabla de organizadores (si existe)
+        # Verificar en la tabla de organizadores
         try:
             org = db.query(TorneoOrganizador).filter(
                 TorneoOrganizador.torneo_id == torneo_id,
@@ -45,6 +52,14 @@ class TorneoService:
     @staticmethod
     def es_owner_torneo(db: Session, torneo_id: int, user_id: int) -> bool:
         """Verifica si un usuario es el owner de un torneo"""
+        from ..models.driveplus_models import Usuario
+        
+        # Verificar si es administrador global (tiene permisos de owner)
+        usuario = db.query(Usuario).filter(Usuario.id_usuario == user_id).first()
+        if usuario and getattr(usuario, 'es_administrador', False):
+            return True
+        
+        # Verificar si es owner en la tabla de organizadores
         org = db.query(TorneoOrganizador).filter(
             TorneoOrganizador.torneo_id == torneo_id,
             TorneoOrganizador.user_id == user_id,

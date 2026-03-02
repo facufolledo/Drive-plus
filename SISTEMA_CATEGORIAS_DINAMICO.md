@@ -61,23 +61,63 @@ function MiComponente() {
 
 ## Cómo agregar/modificar categorías
 
-### 1. Directamente en la base de datos
+### 1. Agregar nueva categoría
 
 ```sql
--- Agregar nueva categoría
+-- Ejemplo: Agregar "2da" categoría
 INSERT INTO categorias (nombre, descripcion, rating_min, rating_max, sexo)
-VALUES ('2da', 'Segunda categoría', 2000, 2199, 'masculino');
+VALUES ('2da', 'Segunda categoría élite', 2000, 2199, 'masculino');
 
--- Modificar nombre de categoría existente
+-- Ejemplo: Agregar "1ra" categoría
+INSERT INTO categorias (nombre, descripcion, rating_min, rating_max, sexo)
+VALUES ('1ra', 'Primera categoría profesional', 2200, 9999, 'masculino');
+```
+
+### 2. Modificar nombre de categoría existente
+
+```sql
+-- Cambiar nombre
 UPDATE categorias 
 SET nombre = '3ra' 
 WHERE id_categoria = 6;
+
+-- Cambiar rangos de rating
+UPDATE categorias 
+SET rating_min = 1800, rating_max = 1999
+WHERE id_categoria = 6;
 ```
 
-### 2. El frontend se actualizará automáticamente
+### 3. Eliminar categoría
+
+```sql
+-- CUIDADO: Asegúrate de que no haya usuarios con esta categoría
+DELETE FROM categorias WHERE id_categoria = 10;
+```
+
+## El frontend se actualizará automáticamente
+
 - El caché se refresca cada 5 minutos
 - O al recargar la página
 - O llamando a `refresh()` del hook
+- **No necesitas tocar código**, el sistema detecta las nuevas categorías
+
+## Ejemplo completo: Agregar categorías profesionales
+
+```sql
+-- Agregar 2da categoría
+INSERT INTO categorias (nombre, descripcion, rating_min, rating_max, sexo)
+VALUES 
+  ('2da', 'Segunda categoría', 2000, 2199, 'masculino'),
+  ('1ra', 'Primera categoría', 2200, 9999, 'masculino');
+
+-- Verificar
+SELECT * FROM categorias ORDER BY rating_min;
+```
+
+Después de ejecutar esto:
+1. El endpoint `/categorias` devolverá las nuevas categorías
+2. Los filtros en el frontend mostrarán "2da" y "1ra" automáticamente
+3. Los usuarios con rating 2000+ se clasificarán en las nuevas categorías
 
 ## Ventajas
 
