@@ -52,9 +52,11 @@ export default function Dashboard() {
   const { salas, cargarSalas } = useSalas();
 
   const [loading, setLoading] = useState(false); // Cambiado a false para mostrar inmediatamente
-  const [ranking, setRanking] = useState<any[]>([]);
+  const [topMasculino, setTopMasculino] = useState<any[]>([]);
+  const [topFemenino, setTopFemenino] = useState<any[]>([]);
   const [partidos, setPartidos] = useState<any[]>([]);
   const [deltaEstaSemana, setDeltaEstaSemana] = useState(0);
+  const [loadingRanking, setLoadingRanking] = useState(true);
 
   const rating = usuario?.rating ?? 1200;
   const nombreCompleto = [usuario?.nombre, usuario?.apellido].filter(Boolean).join(' ') || usuario?.email?.split('@')[0] || 'Jugador';
@@ -68,11 +70,12 @@ export default function Dashboard() {
   }, [categoriaNombre]);
 
   const miEnRanking = useMemo(() => {
-    if (!usuario?.id_usuario || !ranking.length) return null;
+    if (!usuario?.id_usuario) return null;
+    const ranking = [...topMasculino, ...topFemenino];
     return ranking.find((j: any) => j.id_usuario === usuario.id_usuario) ?? null;
-  }, [ranking, usuario?.id_usuario]);
+  }, [topMasculino, topFemenino, usuario?.id_usuario]);
 
-  const posicionRanking = miEnRanking ? (miEnRanking.posicion ?? ranking.findIndex((j: any) => j.id_usuario === usuario?.id_usuario) + 1) : null;
+  const posicionRanking = miEnRanking ? (miEnRanking.posicion ?? [...topMasculino, ...topFemenino].findIndex((j: any) => j.id_usuario === usuario?.id_usuario) + 1) : null;
   const tendencia = (miEnRanking?.tendencia as string) || 'neutral';
 
   const proximaSala = useMemo(() => {
@@ -89,10 +92,8 @@ export default function Dashboard() {
   }, [salas, usuario?.id_usuario]);
 
   const topJugadores = useMemo(() => {
-    const masculinos = ranking.filter((j: any) => j.sexo === 'masculino' || j.sexo === 'M').slice(0, 5);
-    const femeninos = ranking.filter((j: any) => j.sexo === 'femenino' || j.sexo === 'F').slice(0, 5);
-    return { masculino: masculinos, femenino: femeninos };
-  }, [ranking]);
+    return { masculino: topMasculino, femenino: topFemenino };
+  }, [topMasculino, topFemenino]);
 
   // Misma lógica que Mi Perfil: victorias, winrate desde partidos
   const esVictoria = (p: any): boolean => {
@@ -110,23 +111,27 @@ export default function Dashboard() {
     if (!usuario?.id_usuario) return;
     let cancelled = false;
     
+    setLoadingRanking(true);
+    
     // Cargar datos optimizados en una sola llamada
     (async () => {
       try {
         const data = await dashboardService.getDashboardData();
         if (cancelled) return;
         
-        // Combinar top masculino y femenino en un solo ranking
-        const rankingCombinado = [...data.top_masculino, ...data.top_femenino];
-        setRanking(rankingCombinado);
+        setTopMasculino(data.top_masculino);
+        setTopFemenino(data.top_femenino);
         setPartidos(data.ultimos_partidos);
         setDeltaEstaSemana(data.delta_semanal);
       } catch (e) {
         if (!cancelled) {
-          setRanking([]);
+          setTopMasculino([]);
+          setTopFemenino([]);
           setPartidos([]);
           setDeltaEstaSemana(0);
         }
+      } finally {
+        if (!cancelled) setLoadingRanking(false);
       }
     })();
     return () => { cancelled = true; };
@@ -140,12 +145,13 @@ export default function Dashboard() {
 
   // Pts para llegar al Top 10 (diferencia con el 10° del ranking)
   const ptsAlTop10 = useMemo(() => {
+    const ranking = [...topMasculino, ...topFemenino].sort((a, b) => b.rating - a.rating);
     if (!ranking.length || ranking.length < 10) return null;
     const top10 = ranking[9];
     const ratingTop10 = top10?.rating ?? 0;
     const diff = ratingTop10 - rating;
     return diff > 0 ? diff : null;
-  }, [ranking, rating]);
+  }, [topMasculino, topFemenino, rating]);
 
   const mensajeDinamico = useMemo(() => {
     if (tendencia === 'up' && (rating >= 1400 || ptsParaSubir < 50)) return { texto: 'Estás en tu mejor momento', icono: '🔥' };
@@ -313,9 +319,32 @@ export default function Dashboard() {
                 <p className="text-xs font-bold text-accent bg-accent/10 px-2.5 py-1 rounded-lg">A {ptsAlTop10} pts del Top 10</p>
               )}
             </div>
-            {ranking.length === 0 ? (
-              <div className="flex justify-center py-6">
-                <div className="w-6 h-6 border-3 border-accent border-t-transparent rounded-full animate-spin" />
+            {loadingRanking ? (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs font-black text-textSecondary uppercase mb-2">Masculino</p>
+                  <div className="space-y-2">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-cardHover border-2 border-transparent animate-pulse">
+                        <div className="w-5 h-4 bg-cardBorder rounded" />
+                        <div className="flex-1 h-4 bg-cardBorder rounded" />
+                        <div className="w-12 h-4 bg-cardBorder rounded" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-black text-textSecondary uppercase mb-2">Femenino</p>
+                  <div className="space-y-2">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-cardHover border-2 border-transparent animate-pulse">
+                        <div className="w-5 h-4 bg-cardBorder rounded" />
+                        <div className="flex-1 h-4 bg-cardBorder rounded" />
+                        <div className="w-12 h-4 bg-cardBorder rounded" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-4">
