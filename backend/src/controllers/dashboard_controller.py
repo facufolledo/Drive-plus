@@ -28,14 +28,14 @@ async def obtener_datos_dashboard(
         user_id = current_user.id_usuario
         
         # QUERY 1: Top 5 masculino + Top 5 femenino en UNA SOLA QUERY
-        # Normalizar sexo: M/masculino -> M, F/femenino -> F
+        # Usar IN en lugar de UPPER para aprovechar índices
         top_query = text("""
             (
                 SELECT u.id_usuario, u.nombre_usuario, u.rating, u.sexo,
                        p.nombre, p.apellido, 'M' as sexo_norm
                 FROM usuario u
                 JOIN perfil_usuario p ON u.id_usuario = p.id_usuario
-                WHERE UPPER(u.sexo) IN ('M', 'MASCULINO')
+                WHERE u.sexo IN ('M', 'masculino', 'MASCULINO')
                 ORDER BY u.rating DESC
                 LIMIT 5
             )
@@ -45,7 +45,7 @@ async def obtener_datos_dashboard(
                        p.nombre, p.apellido, 'F' as sexo_norm
                 FROM usuario u
                 JOIN perfil_usuario p ON u.id_usuario = p.id_usuario
-                WHERE UPPER(u.sexo) IN ('F', 'FEMENINO')
+                WHERE u.sexo IN ('F', 'femenino', 'FEMENINO')
                 ORDER BY u.rating DESC
                 LIMIT 5
             )
@@ -70,21 +70,18 @@ async def obtener_datos_dashboard(
             else:
                 top_femenino.append(jugador)
         
-        # QUERY 2: Últimos 3 partidos con resultado en UNA SOLA QUERY
+        # QUERY 2: Últimos 3 partidos con DISTINCT ON para evitar duplicados
+        # Simplificado: usar solo delta para determinar victoria
         partidos_query = text("""
-            SELECT 
+            SELECT DISTINCT ON (p.id_partido)
                 p.id_partido,
                 p.fecha,
-                r.sets_eq1,
-                r.sets_eq2,
-                pj.equipo,
                 h.delta
             FROM partido_jugador pj
             JOIN partido p ON pj.id_partido = p.id_partido
-            LEFT JOIN resultado_partido r ON p.id_partido = r.id_partido
             LEFT JOIN historial_rating h ON p.id_partido = h.id_partido AND h.id_usuario = :user_id
             WHERE pj.id_usuario = :user_id
-            ORDER BY p.fecha DESC
+            ORDER BY p.id_partido, p.fecha DESC
             LIMIT 3
         """)
         
@@ -92,17 +89,10 @@ async def obtener_datos_dashboard(
         
         partidos_data = []
         for row in partidos_result:
-            id_partido, fecha, sets_eq1, sets_eq2, equipo, delta = row
+            id_partido, fecha, delta = row
             
-            # Determinar victoria
-            victoria = False
-            if sets_eq1 is not None and sets_eq2 is not None:
-                if equipo == 1:
-                    victoria = sets_eq1 > sets_eq2
-                else:
-                    victoria = sets_eq2 > sets_eq1
-            elif delta is not None:
-                victoria = delta > 0
+            # Victoria determinada por delta (más simple y confiable)
+            victoria = delta > 0 if delta is not None else False
             
             partidos_data.append({
                 "id_partido": id_partido,
