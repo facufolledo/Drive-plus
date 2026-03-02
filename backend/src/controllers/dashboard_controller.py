@@ -106,7 +106,7 @@ async def obtener_datos_dashboard(
         delta_query = text("""
             SELECT COALESCE(SUM(delta), 0) as total
             FROM historial_rating
-            WHERE id_usuario = :user_id AND fecha >= :fecha_limite
+            WHERE id_usuario = :user_id AND creado_en >= :fecha_limite
         """)
         
         delta_result = db.execute(delta_query, {
