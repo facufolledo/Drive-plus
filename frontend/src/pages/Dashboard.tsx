@@ -56,7 +56,27 @@ export default function Dashboard() {
   const [topFemenino, setTopFemenino] = useState<any[]>([]);
   const [partidos, setPartidos] = useState<any[]>([]);
   const [deltaEstaSemana, setDeltaEstaSemana] = useState(0);
-  const [loadingRanking, setLoadingRanking] = useState(true);
+  const [loadingRanking, setLoadingRanking] = useState(false); // Cambiado a false para mostrar cache inmediatamente
+
+  // Cargar datos del cache al inicio
+  useEffect(() => {
+    const cached = localStorage.getItem('dashboard_cache');
+    if (cached) {
+      try {
+        const data = JSON.parse(cached);
+        const cacheAge = Date.now() - (data.timestamp || 0);
+        // Si el cache tiene menos de 5 minutos, usarlo
+        if (cacheAge < 5 * 60 * 1000) {
+          setTopMasculino(data.top_masculino || []);
+          setTopFemenino(data.top_femenino || []);
+          setPartidos(data.ultimos_partidos || []);
+          setDeltaEstaSemana(data.delta_semanal || 0);
+        }
+      } catch (e) {
+        console.error('Error cargando cache:', e);
+      }
+    }
+  }, []);
 
   const rating = usuario?.rating ?? 1200;
   const nombreCompleto = [usuario?.nombre, usuario?.apellido].filter(Boolean).join(' ') || usuario?.email?.split('@')[0] || 'Jugador';
@@ -111,7 +131,9 @@ export default function Dashboard() {
     if (!usuario?.id_usuario) return;
     let cancelled = false;
     
-    setLoadingRanking(true);
+    // Solo mostrar loading si no hay datos cacheados
+    const hasCache = topMasculino.length > 0 || topFemenino.length > 0;
+    if (!hasCache) setLoadingRanking(true);
     
     // Cargar datos optimizados en una sola llamada
     (async () => {
@@ -119,10 +141,21 @@ export default function Dashboard() {
         const data = await dashboardService.getDashboardData();
         if (cancelled) return;
         
-        setTopMasculino(data.top_masculino || []);
-        setTopFemenino(data.top_femenino || []);
-        setPartidos(data.ultimos_partidos || []);
-        setDeltaEstaSemana(data.delta_semanal || 0);
+        const newData = {
+          top_masculino: data.top_masculino || [],
+          top_femenino: data.top_femenino || [],
+          ultimos_partidos: data.ultimos_partidos || [],
+          delta_semanal: data.delta_semanal || 0,
+          timestamp: Date.now()
+        };
+        
+        setTopMasculino(newData.top_masculino);
+        setTopFemenino(newData.top_femenino);
+        setPartidos(newData.ultimos_partidos);
+        setDeltaEstaSemana(newData.delta_semanal);
+        
+        // Guardar en cache
+        localStorage.setItem('dashboard_cache', JSON.stringify(newData));
       } catch (e) {
         console.error('Error cargando dashboard optimizado, usando fallback:', e);
         // Fallback: usar método anterior si el nuevo endpoint falla
@@ -173,12 +206,24 @@ export default function Dashboard() {
               .reduce((acc: number, p: any) => acc + (p.historial_rating?.delta ?? 0), 0);
             
             setDeltaEstaSemana(deltaSemana);
+            
+            // Guardar en cache
+            const cacheData = {
+              top_masculino: masculinos,
+              top_femenino: femeninos,
+              ultimos_partidos: partidosFormateados,
+              delta_semanal: deltaSemana,
+              timestamp: Date.now()
+            };
+            localStorage.setItem('dashboard_cache', JSON.stringify(cacheData));
           } catch (fallbackError) {
             console.error('Error en fallback:', fallbackError);
-            setTopMasculino([]);
-            setTopFemenino([]);
-            setPartidos([]);
-            setDeltaEstaSemana(0);
+            if (!hasCache) {
+              setTopMasculino([]);
+              setTopFemenino([]);
+              setPartidos([]);
+              setDeltaEstaSemana(0);
+            }
           }
         }
       } finally {
