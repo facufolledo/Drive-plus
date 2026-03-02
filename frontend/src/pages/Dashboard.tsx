@@ -59,6 +59,7 @@ export default function Dashboard() {
   const rating = usuario?.rating ?? 1200;
   const nombreCompleto = [usuario?.nombre, usuario?.apellido].filter(Boolean).join(' ') || usuario?.email?.split('@')[0] || 'Jugador';
   const ciudad = (usuario as any)?.ciudad;
+  const esFemenino = usuario?.sexo === 'femenino' || usuario?.sexo === 'F';
 
   const { nombre: categoriaNombre, siguienteUmbral, ptsParaSubir, progresoPct } = getCategoriaDesdeRating(rating);
   const siguienteCategoria = useMemo(() => {
@@ -198,7 +199,7 @@ export default function Dashboard() {
                     {/* Columna izquierda: Info del usuario */}
                     <div className="flex-1 flex flex-col justify-center">
                       <div className="mb-2">
-                        <p className="text-base md:text-lg text-textSecondary font-medium mb-1">Bienvenido,</p>
+                        <p className="text-base md:text-lg text-textSecondary font-medium mb-1">{esFemenino ? 'Bienvenida,' : 'Bienvenido,'}</p>
                         <div className="flex items-center gap-3 mb-2">
                           <h1 className="text-2xl md:text-3xl font-black text-textPrimary">{nombreCompleto}</h1>
                           <span className="px-3 py-1.5 rounded-lg text-xs font-black uppercase bg-gradient-to-r from-primary to-primary/80 text-white border-2 border-primary/60 shadow-lg flex-shrink-0">
