@@ -188,7 +188,7 @@ export default function Dashboard() {
             <div className="relative p-6 md:p-8 h-full flex flex-col justify-between">
               <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-transparent to-secondary/10" />
               <div className="absolute top-0 right-0 w-64 h-64 bg-primary/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-              <div className="relative z-10 flex-1 flex items-center justify-between gap-12">
+              <div className="relative z-10 flex-1 flex items-center justify-between gap-6 md:gap-12">
                 {loading ? (
                   <div className="flex justify-center py-8 w-full">
                     <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin" />
@@ -257,8 +257,8 @@ export default function Dashboard() {
                     {/* Columna derecha: Rating gigante */}
                     <div className="flex flex-col items-end justify-center">
                       <div className="text-right">
-                        <span className="block text-[80px] leading-none font-black text-primary tabular-nums drop-shadow-[0_0_35px_rgba(0,85,255,0.7)]">{rating}</span>
-                        <span className="block text-lg text-textSecondary font-bold -mt-2">pts</span>
+                        <span className="block text-[50px] md:text-[80px] leading-none font-black text-primary tabular-nums drop-shadow-[0_0_35px_rgba(0,85,255,0.7)]">{rating}</span>
+                        <span className="block text-sm md:text-lg text-textSecondary font-bold -mt-1 md:-mt-2">pts</span>
                       </div>
                     </div>
                   </>
