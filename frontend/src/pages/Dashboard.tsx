@@ -10,9 +10,6 @@ import {
   Minus,
   Swords,
   Target,
-  Flame,
-  ChevronRight,
-  Sparkles,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSalas } from '../context/SalasContext';
@@ -105,7 +102,7 @@ export default function Dashboard() {
     return p.resultado.sets_eq2 > p.resultado.sets_eq1;
   };
 
-  const { totalPartidos, victorias, winrate, rachaActual, rachaVictorias, deltaEstaSemana } = useMemo(() => {
+  const { totalPartidos, winrate, deltaEstaSemana } = useMemo(() => {
     const conResultado = partidos.filter((p) => p.resultado || p.historial_rating);
     const total = conResultado.length;
     const wins = conResultado.filter(esVictoria).length;
@@ -126,7 +123,7 @@ export default function Dashboard() {
     const deltaSemana = partidos
       .filter((p) => new Date(p.fecha).getTime() >= hace7Dias && p.historial_rating)
       .reduce((acc, p) => acc + (p.historial_rating?.delta ?? 0), 0);
-    return { totalPartidos: total, victorias: wins, winrate: wr, rachaActual: racha, rachaVictorias: rachaW, deltaEstaSemana: deltaSemana };
+    return { totalPartidos: total, winrate: wr, deltaEstaSemana: deltaSemana };
   }, [partidos, usuario?.id_usuario]);
 
   useEffect(() => {
@@ -158,7 +155,7 @@ export default function Dashboard() {
     if (usuario?.id_usuario) cargarSalas();
   }, [usuario?.id_usuario, cargarSalas]);
 
-  const rachaLabel = rachaActual > 0 ? `${rachaActual}${rachaVictorias ? 'W' : 'L'}` : null;
+
 
   // Pts para llegar al Top 10 (diferencia con el 10° del ranking)
   const ptsAlTop10 = useMemo(() => {
@@ -191,48 +188,79 @@ export default function Dashboard() {
             <div className="relative p-6 md:p-8 h-full flex flex-col justify-between">
               <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-transparent to-secondary/10" />
               <div className="absolute top-0 right-0 w-64 h-64 bg-primary/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-              <div className="relative z-10 flex-1 flex flex-col justify-center">
+              <div className="relative z-10 flex-1 flex items-center justify-between gap-12">
                 {loading ? (
-                  <div className="flex justify-center py-8">
+                  <div className="flex justify-center py-8 w-full">
                     <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin" />
                   </div>
                 ) : (
                   <>
-                    <div className="mb-2">
-                      <p className="text-base md:text-lg text-textSecondary font-medium mb-1">Bienvenido,</p>
-                      <div className="flex items-center justify-between gap-3">
-                        <h1 className="text-2xl md:text-3xl font-black text-textPrimary">{nombreCompleto}</h1>
-                        <span className="px-3 py-1.5 rounded-lg text-xs font-black uppercase bg-gradient-to-r from-primary to-primary/80 text-white border-2 border-primary/60 shadow-lg flex-shrink-0">
-                          {categoriaNombre}
-                        </span>
-                      </div>
-                    </div>
-                    {posicionRanking && ciudad && (
-                      <p className="text-sm font-bold text-accent mb-4">#{posicionRanking} en {ciudad}</p>
-                    )}
-                    <div className="flex items-baseline gap-3 mb-3">
-                      <span className="text-6xl md:text-7xl font-black text-primary tabular-nums">{rating}</span>
-                      <span className="text-lg text-textSecondary font-semibold">rating</span>
-                    </div>
-                    {(deltaEstaSemana !== 0 || tendencia !== 'neutral') && (
-                      <div className={`flex items-center gap-2 mb-4 text-sm font-bold ${tendencia === 'up' ? 'text-green-400' : tendencia === 'down' ? 'text-amber-400' : 'text-textSecondary'}`}>
-                        <span className="flex items-center gap-1.5 bg-cardBg/50 px-3 py-1.5 rounded-lg">
-                          <TendenciaIcon className="w-4 h-4" />
-                          {deltaEstaSemana !== 0 ? `${deltaEstaSemana > 0 ? '+' : ''}${deltaEstaSemana} esta semana` : tendencia === 'up' ? 'Subiendo' : 'Bajando'}
-                        </span>
-                      </div>
-                    )}
-                    {siguienteCategoria && siguienteUmbral && (
-                      <div className="space-y-2 mt-auto">
-                        <div className="flex justify-between text-sm font-bold">
-                          <span className="text-textPrimary">{ptsParaSubir} pts para {siguienteCategoria}</span>
-                          <span className="text-accent">{Math.round(progresoPct)}%</span>
+                    {/* Columna izquierda: Info del usuario */}
+                    <div className="flex-1 flex flex-col justify-center">
+                      <div className="mb-2">
+                        <p className="text-base md:text-lg text-textSecondary font-medium mb-1">Bienvenido,</p>
+                        <div className="flex items-center gap-3 mb-2">
+                          <h1 className="text-2xl md:text-3xl font-black text-textPrimary">{nombreCompleto}</h1>
+                          <span className="px-3 py-1.5 rounded-lg text-xs font-black uppercase bg-gradient-to-r from-primary to-primary/80 text-white border-2 border-primary/60 shadow-lg flex-shrink-0">
+                            {categoriaNombre}
+                          </span>
                         </div>
-                        <div className="h-3 bg-cardBorder/50 rounded-full overflow-hidden">
-                          <div className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-500" style={{ width: `${progresoPct}%` }} />
+                      </div>
+                      {posicionRanking && ciudad && (
+                        <p className="text-sm font-bold text-accent mb-4">#{posicionRanking} en {ciudad}</p>
+                      )}
+                    
+                    {/* Últimos 3 partidos */}
+                    {partidos.length > 0 && (
+                      <div className="flex items-center gap-3 mb-4">
+                        <span className="text-xs text-textSecondary font-semibold">Últimos 3 partidos:</span>
+                        <div className="flex gap-2">
+                          {partidos.slice(0, 3).map((partido, idx) => {
+                            const victoria = esVictoria(partido);
+                            return (
+                              <div key={idx} className={`w-7 h-7 rounded-full flex items-center justify-center shadow-lg ${victoria ? 'bg-green-500' : 'bg-red-500'}`}>
+                                <span className="text-white text-sm font-black">{victoria ? '✓' : '✗'}</span>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
+
+                    {/* Variación de rating */}
+                    {deltaEstaSemana !== 0 && (
+                      <div className={`flex items-center gap-2 mb-4 px-3 py-1.5 rounded-lg border-2 inline-flex ${deltaEstaSemana > 0 ? 'bg-green-500/20 border-green-500/40 text-green-400' : 'bg-red-500/20 border-red-500/40 text-red-400'}`}>
+                        <TendenciaIcon className="w-4 h-4" />
+                        <span className="text-sm font-black">{deltaEstaSemana > 0 ? '+' : ''}{deltaEstaSemana} pts esta semana</span>
+                      </div>
+                    )}
+                    
+                      {siguienteCategoria && siguienteUmbral && (
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm font-bold">
+                            <span className="text-textPrimary">Estás a {ptsParaSubir} pts de {siguienteCategoria}</span>
+                            <span className="text-accent">{Math.round(progresoPct)}%</span>
+                          </div>
+                          <div className="h-3 bg-cardBorder/50 rounded-full overflow-hidden shadow-inner">
+                            <div className="h-full bg-gradient-to-r from-primary via-blue-400 to-accent rounded-full transition-all duration-500 shadow-lg" style={{ width: `${progresoPct}%` }} />
+                          </div>
+                          {/* Mensaje motivacional mejorado */}
+                          {ptsParaSubir <= 100 && (
+                            <p className="text-xs text-accent font-bold">
+                              💪 Ganando {Math.ceil(ptsParaSubir / 25)} partidos podrías ascender
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Columna derecha: Rating gigante */}
+                    <div className="flex flex-col items-end justify-center">
+                      <div className="text-right">
+                        <span className="block text-[80px] leading-none font-black text-primary tabular-nums drop-shadow-[0_0_35px_rgba(0,85,255,0.7)]">{rating}</span>
+                        <span className="block text-lg text-textSecondary font-bold -mt-2">pts</span>
+                      </div>
+                    </div>
                   </>
                 )}
               </div>
@@ -242,9 +270,15 @@ export default function Dashboard() {
 
         {/* Stats y acciones */}
         <div className="flex flex-col gap-4">
+          {/* Mensaje motivacional mejorado */}
           <div className="flex items-center gap-3 p-4 rounded-xl bg-gradient-to-r from-accent/20 to-accent/10 border-2 border-accent/30 shadow-lg">
-            <span className="text-3xl">{mensajeDinamico.icono}</span>
-            <p className="text-textPrimary font-bold text-sm">{mensajeDinamico.texto}</p>
+            <span className="text-3xl flex-shrink-0">{mensajeDinamico.icono}</span>
+            <div>
+              <p className="text-textPrimary font-bold text-sm">{mensajeDinamico.texto}</p>
+              {ptsAlTop10 && ptsAlTop10 <= 100 && (
+                <p className="text-xs text-accent font-semibold mt-1">🎯 A solo {ptsAlTop10} pts del Top 10</p>
+              )}
+            </div>
           </div>
           
           <Card className="border-2 border-cardBorder bg-gradient-to-br from-cardBg to-cardBg/50">
@@ -253,15 +287,6 @@ export default function Dashboard() {
                 <div className="text-2xl font-black text-primary">{winrate}%</div>
                 <div className="text-[10px] text-textSecondary font-semibold">Winrate</div>
               </div>
-              {rachaLabel && (
-                <div className="text-center">
-                  <div className="flex items-center justify-center gap-1 text-2xl font-black text-amber-400">
-                    <Flame className="w-5 h-5" />
-                    {rachaLabel}
-                  </div>
-                  <div className="text-[10px] text-textSecondary font-semibold">Racha</div>
-                </div>
-              )}
               <div className="text-center">
                 <div className="text-2xl font-black text-secondary">{totalPartidos}</div>
                 <div className="text-[10px] text-textSecondary font-semibold">Partidos</div>
@@ -281,10 +306,10 @@ export default function Dashboard() {
                   <p className="text-xs text-textSecondary">{proximaSala.fecha ? new Date(proximaSala.fecha).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' }) : 'Próximamente'}</p>
                 </div>
               ) : (
-                <div className="rounded-xl bg-gradient-to-r from-primary/20 to-secondary/20 border-2 border-primary/40 p-4 text-center">
-                  <p className="text-textPrimary text-sm font-bold mb-3">Creá una sala y sumá puntos</p>
-                  <button onClick={() => navigate('/salas')} className="px-5 py-2.5 rounded-xl font-black text-sm bg-gradient-to-r from-primary to-primary/90 text-white hover:scale-105 transition-all shadow-xl">
-                    <Target className="w-4 h-4 inline mr-2" />
+                <div className="rounded-xl bg-gradient-to-br from-primary/30 to-secondary/30 border-2 border-primary/50 p-5 text-center shadow-xl">
+                  <p className="text-textPrimary text-base font-black mb-4">Creá una sala y sumá puntos</p>
+                  <button onClick={() => navigate('/salas')} className="w-full px-8 py-4 rounded-xl font-black text-lg bg-gradient-to-r from-primary via-blue-600 to-primary text-white hover:scale-105 transition-all shadow-2xl shadow-primary/50 border-2 border-primary/30">
+                    <Target className="w-6 h-6 inline mr-2" />
                     Crear sala
                   </button>
                 </div>
