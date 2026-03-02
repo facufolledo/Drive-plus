@@ -13,8 +13,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSalas } from '../context/SalasContext';
-import { apiService } from '../services/api';
-import { perfilService } from '../services/perfil.service';
+import { dashboardService } from '../services/dashboard.service';
 import type { PartidoHistorial } from '../services/perfil.service';
 
 // --- Helpers de categoría y progreso (mismo criterio que MiPerfil) ---
@@ -54,7 +53,8 @@ export default function Dashboard() {
 
   const [loading, setLoading] = useState(false); // Cambiado a false para mostrar inmediatamente
   const [ranking, setRanking] = useState<any[]>([]);
-  const [partidos, setPartidos] = useState<PartidoHistorial[]>([]);
+  const [partidos, setPartidos] = useState<any[]>([]);
+  const [deltaEstaSemana, setDeltaEstaSemana] = useState(0);
 
   const rating = usuario?.rating ?? 1200;
   const nombreCompleto = [usuario?.nombre, usuario?.apellido].filter(Boolean).join(' ') || usuario?.email?.split('@')[0] || 'Jugador';
@@ -94,55 +94,39 @@ export default function Dashboard() {
     return { masculino: masculinos, femenino: femeninos };
   }, [ranking]);
 
-  // Misma lógica que Mi Perfil: victorias, winrate y racha desde partidos
-  const esVictoria = (p: PartidoHistorial): boolean => {
-    if (!p.resultado && p.historial_rating) return p.historial_rating.delta > 0;
-    if (!p.resultado) return false;
-    const miEquipo = p.jugadores.find((j) => j.id_usuario === usuario?.id_usuario)?.equipo;
-    if (miEquipo === 1) return p.resultado.sets_eq1 > p.resultado.sets_eq2;
-    return p.resultado.sets_eq2 > p.resultado.sets_eq1;
+  // Misma lógica que Mi Perfil: victorias, winrate desde partidos
+  const esVictoria = (p: any): boolean => {
+    return p.victoria === true;
   };
 
-  const { totalPartidos, winrate, deltaEstaSemana } = useMemo(() => {
-    const conResultado = partidos.filter((p) => p.resultado || p.historial_rating);
-    const total = conResultado.length;
-    const wins = conResultado.filter(esVictoria).length;
+  const { totalPartidos, winrate } = useMemo(() => {
+    const total = partidos.length;
+    const wins = partidos.filter(esVictoria).length;
     const wr = total > 0 ? Math.round((wins / total) * 100) : 0;
-    let racha = 0;
-    let rachaW = true;
-    const ordenados = [...partidos].sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
-    for (const p of ordenados) {
-      if (!p.resultado && !p.historial_rating) continue;
-      const v = esVictoria(p);
-      if (racha === 0) {
-        rachaW = v;
-        racha = 1;
-      } else if (v === rachaW) racha++;
-      else break;
-    }
-    const hace7Dias = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    const deltaSemana = partidos
-      .filter((p) => new Date(p.fecha).getTime() >= hace7Dias && p.historial_rating)
-      .reduce((acc, p) => acc + (p.historial_rating?.delta ?? 0), 0);
-    return { totalPartidos: total, winrate: wr, deltaEstaSemana: deltaSemana };
-  }, [partidos, usuario?.id_usuario]);
+    return { totalPartidos: total, winrate: wr };
+  }, [partidos]);
 
   useEffect(() => {
     if (!usuario?.id_usuario) return;
     let cancelled = false;
     
-    // Cargar datos en segundo plano sin bloquear la UI
+    // Cargar datos optimizados en una sola llamada
     (async () => {
       try {
-        const [rankingRes, partidosRes] = await Promise.all([
-          apiService.getRankingGeneral(20, 0),
-          perfilService.getHistorial(usuario.id_usuario, 5).catch(() => []),
-        ]);
+        const data = await dashboardService.getDashboardData();
         if (cancelled) return;
-        setRanking(Array.isArray(rankingRes) ? rankingRes : []);
-        setPartidos(Array.isArray(partidosRes) ? partidosRes : []);
+        
+        // Combinar top masculino y femenino en un solo ranking
+        const rankingCombinado = [...data.top_masculino, ...data.top_femenino];
+        setRanking(rankingCombinado);
+        setPartidos(data.ultimos_partidos);
+        setDeltaEstaSemana(data.delta_semanal);
       } catch (e) {
-        if (!cancelled) setRanking([]);
+        if (!cancelled) {
+          setRanking([]);
+          setPartidos([]);
+          setDeltaEstaSemana(0);
+        }
       }
     })();
     return () => { cancelled = true; };
