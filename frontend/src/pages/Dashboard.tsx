@@ -52,7 +52,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { salas, cargarSalas } = useSalas();
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Cambiado a false para mostrar inmediatamente
   const [ranking, setRanking] = useState<any[]>([]);
   const [partidos, setPartidos] = useState<PartidoHistorial[]>([]);
 
@@ -128,26 +128,21 @@ export default function Dashboard() {
   }, [partidos, usuario?.id_usuario]);
 
   useEffect(() => {
-    if (!usuario?.id_usuario) {
-      setLoading(false);
-      return;
-    }
+    if (!usuario?.id_usuario) return;
     let cancelled = false;
+    
+    // Cargar datos en segundo plano sin bloquear la UI
     (async () => {
-      setLoading(true);
       try {
-        // Cargar solo lo esencial primero
         const [rankingRes, partidosRes] = await Promise.all([
-          apiService.getRankingGeneral(20, 0), // Solo top 20 (necesitamos top 5 de cada género)
-          perfilService.getHistorial(usuario.id_usuario, 5).catch(() => []), // Solo 5 partidos
+          apiService.getRankingGeneral(20, 0),
+          perfilService.getHistorial(usuario.id_usuario, 5).catch(() => []),
         ]);
         if (cancelled) return;
         setRanking(Array.isArray(rankingRes) ? rankingRes : []);
         setPartidos(Array.isArray(partidosRes) ? partidosRes : []);
       } catch (e) {
         if (!cancelled) setRanking([]);
-      } finally {
-        if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
@@ -191,7 +186,7 @@ export default function Dashboard() {
               <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-transparent to-secondary/10" />
               <div className="absolute top-0 right-0 w-64 h-64 bg-primary/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
               <div className="relative z-10 flex-1 flex items-center justify-between gap-6 md:gap-12">
-                {loading ? (
+                {!usuario ? (
                   <div className="flex justify-center py-8 w-full">
                     <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin" />
                   </div>
@@ -334,7 +329,7 @@ export default function Dashboard() {
                 <p className="text-xs font-bold text-accent bg-accent/10 px-2.5 py-1 rounded-lg">A {ptsAlTop10} pts del Top 10</p>
               )}
             </div>
-            {loading ? (
+            {ranking.length === 0 ? (
               <div className="flex justify-center py-6">
                 <div className="w-6 h-6 border-3 border-accent border-t-transparent rounded-full animate-spin" />
               </div>
