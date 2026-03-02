@@ -119,16 +119,63 @@ export default function Dashboard() {
         const data = await dashboardService.getDashboardData();
         if (cancelled) return;
         
-        setTopMasculino(data.top_masculino);
-        setTopFemenino(data.top_femenino);
-        setPartidos(data.ultimos_partidos);
-        setDeltaEstaSemana(data.delta_semanal);
+        setTopMasculino(data.top_masculino || []);
+        setTopFemenino(data.top_femenino || []);
+        setPartidos(data.ultimos_partidos || []);
+        setDeltaEstaSemana(data.delta_semanal || 0);
       } catch (e) {
+        console.error('Error cargando dashboard optimizado, usando fallback:', e);
+        // Fallback: usar método anterior si el nuevo endpoint falla
         if (!cancelled) {
-          setTopMasculino([]);
-          setTopFemenino([]);
-          setPartidos([]);
-          setDeltaEstaSemana(0);
+          try {
+            const { apiService } = await import('../services/api');
+            const { perfilService } = await import('../services/perfil.service');
+            
+            const [rankingRes, partidosRes] = await Promise.all([
+              apiService.getRankingGeneral(20, 0),
+              perfilService.getHistorial(usuario.id_usuario, 5).catch(() => []),
+            ]);
+            
+            if (cancelled) return;
+            
+            const ranking = Array.isArray(rankingRes) ? rankingRes : [];
+            const masculinos = ranking.filter((j: any) => j.sexo === 'masculino' || j.sexo === 'M').slice(0, 5);
+            const femeninos = ranking.filter((j: any) => j.sexo === 'femenino' || j.sexo === 'F').slice(0, 5);
+            
+            setTopMasculino(masculinos);
+            setTopFemenino(femeninos);
+            
+            // Convertir partidos al formato esperado
+            const partidosFormateados = (Array.isArray(partidosRes) ? partidosRes : []).slice(0, 3).map((p: any) => {
+              const esVictoria = p.historial_rating?.delta > 0 || 
+                (p.resultado && p.jugadores?.find((j: any) => j.id_usuario === usuario.id_usuario)?.equipo === 1 
+                  ? p.resultado.sets_eq1 > p.resultado.sets_eq2 
+                  : p.resultado?.sets_eq2 > p.resultado?.sets_eq1);
+              
+              return {
+                id_partido: p.id_partido,
+                fecha: p.fecha,
+                victoria: esVictoria,
+                delta: p.historial_rating?.delta || 0
+              };
+            });
+            
+            setPartidos(partidosFormateados);
+            
+            // Calcular delta semanal
+            const hace7Dias = Date.now() - 7 * 24 * 60 * 60 * 1000;
+            const deltaSemana = (Array.isArray(partidosRes) ? partidosRes : [])
+              .filter((p: any) => new Date(p.fecha).getTime() >= hace7Dias && p.historial_rating)
+              .reduce((acc: number, p: any) => acc + (p.historial_rating?.delta ?? 0), 0);
+            
+            setDeltaEstaSemana(deltaSemana);
+          } catch (fallbackError) {
+            console.error('Error en fallback:', fallbackError);
+            setTopMasculino([]);
+            setTopFemenino([]);
+            setPartidos([]);
+            setDeltaEstaSemana(0);
+          }
         }
       } finally {
         if (!cancelled) setLoadingRanking(false);
