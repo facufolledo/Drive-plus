@@ -33,8 +33,8 @@ async def obtener_datos_dashboard(
             (
                 SELECT u.id_usuario, u.nombre_usuario, u.rating, u.sexo,
                        p.nombre, p.apellido, 'M' as sexo_norm
-                FROM usuario u
-                JOIN perfil_usuario p ON u.id_usuario = p.id_usuario
+                FROM usuarios u
+                JOIN perfil_usuarios p ON u.id_usuario = p.id_usuario
                 WHERE u.sexo IN ('M', 'masculino', 'MASCULINO')
                 ORDER BY u.rating DESC
                 LIMIT 5
@@ -43,8 +43,8 @@ async def obtener_datos_dashboard(
             (
                 SELECT u.id_usuario, u.nombre_usuario, u.rating, u.sexo,
                        p.nombre, p.apellido, 'F' as sexo_norm
-                FROM usuario u
-                JOIN perfil_usuario p ON u.id_usuario = p.id_usuario
+                FROM usuarios u
+                JOIN perfil_usuarios p ON u.id_usuario = p.id_usuario
                 WHERE u.sexo IN ('F', 'femenino', 'FEMENINO')
                 ORDER BY u.rating DESC
                 LIMIT 5
@@ -77,8 +77,8 @@ async def obtener_datos_dashboard(
                 p.id_partido,
                 p.fecha,
                 h.delta
-            FROM partido_jugador pj
-            JOIN partido p ON pj.id_partido = p.id_partido
+            FROM partido_jugadores pj
+            JOIN partidos p ON pj.id_partido = p.id_partido
             LEFT JOIN historial_rating h ON p.id_partido = h.id_partido AND h.id_usuario = :user_id
             WHERE pj.id_usuario = :user_id
             ORDER BY p.id_partido, p.fecha DESC
