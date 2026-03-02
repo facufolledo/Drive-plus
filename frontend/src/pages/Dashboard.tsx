@@ -136,9 +136,10 @@ export default function Dashboard() {
     (async () => {
       setLoading(true);
       try {
+        // Cargar solo lo esencial primero
         const [rankingRes, partidosRes] = await Promise.all([
-          apiService.getRankingGeneral(50, 0), // Reducido de 200 a 50
-          perfilService.getHistorial(usuario.id_usuario, 10).catch(() => []), // Reducido de 100 a 10 (solo necesitamos 3)
+          apiService.getRankingGeneral(20, 0), // Solo top 20 (necesitamos top 5 de cada género)
+          perfilService.getHistorial(usuario.id_usuario, 5).catch(() => []), // Solo 5 partidos
         ]);
         if (cancelled) return;
         setRanking(Array.isArray(rankingRes) ? rankingRes : []);
