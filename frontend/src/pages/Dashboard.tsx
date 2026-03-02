@@ -131,16 +131,20 @@ export default function Dashboard() {
             const { apiService } = await import('../services/api');
             const { perfilService } = await import('../services/perfil.service');
             
-            const [rankingRes, partidosRes] = await Promise.all([
-              apiService.getRankingGeneral(20, 0),
+            // Pedir rankings separados por sexo (más rápido)
+            const [rankingMasculino, rankingFemenino, partidosRes] = await Promise.all([
+              apiService.getRankingGeneral(5, 0, 'masculino'),
+              apiService.getRankingGeneral(5, 0, 'femenino'),
               perfilService.getHistorial(usuario.id_usuario, 5).catch(() => []),
             ]);
             
             if (cancelled) return;
             
-            const ranking = Array.isArray(rankingRes) ? rankingRes : [];
-            const masculinos = ranking.filter((j: any) => j.sexo === 'masculino' || j.sexo === 'M').slice(0, 5);
-            const femeninos = ranking.filter((j: any) => j.sexo === 'femenino' || j.sexo === 'F').slice(0, 5);
+            const masculinos = Array.isArray(rankingMasculino) ? rankingMasculino.slice(0, 5) : [];
+            const femeninos = Array.isArray(rankingFemenino) ? rankingFemenino.slice(0, 5) : [];
+            
+            console.log('Fallback - Masculino:', masculinos.length, masculinos);
+            console.log('Fallback - Femenino:', femeninos.length, femeninos);
             
             setTopMasculino(masculinos);
             setTopFemenino(femeninos);
