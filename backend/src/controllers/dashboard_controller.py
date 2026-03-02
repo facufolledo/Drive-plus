@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc, case
 from typing import Optional
-from ..database import get_db
+from ..database.config import get_db
 from ..models.usuario_models import Usuario
 from ..models.partido_models import Partido, PartidoJugador, ResultadoPartido
 from ..models.historial_rating_models import HistorialRating
