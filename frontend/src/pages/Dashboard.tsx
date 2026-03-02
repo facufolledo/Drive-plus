@@ -137,8 +137,8 @@ export default function Dashboard() {
       setLoading(true);
       try {
         const [rankingRes, partidosRes] = await Promise.all([
-          apiService.getRankingGeneral(200, 0),
-          perfilService.getHistorial(usuario.id_usuario, 100).catch(() => []),
+          apiService.getRankingGeneral(50, 0), // Reducido de 200 a 50
+          perfilService.getHistorial(usuario.id_usuario, 10).catch(() => []), // Reducido de 100 a 10 (solo necesitamos 3)
         ]);
         if (cancelled) return;
         setRanking(Array.isArray(rankingRes) ? rankingRes : []);
