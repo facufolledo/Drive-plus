@@ -1,7 +1,7 @@
 import React from 'react';
 import { CorsDebug } from '../components/CorsDebug';
 
-export const CorsDebugPage: React.FC = () => {
+function CorsDebugPage() {
   return (
     <div className="min-h-screen bg-gray-100 py-8">
       <div className="container mx-auto px-4">
@@ -27,4 +27,6 @@ export const CorsDebugPage: React.FC = () => {
       </div>
     </div>
   );
-};
+}
+
+export default CorsDebugPage;

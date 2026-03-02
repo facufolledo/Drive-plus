@@ -14,27 +14,27 @@ import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
-import { CorsDebugPage } from './pages/CorsDebugPage';
+import Dashboard from './pages/Dashboard';
 
 // Lazy loading para páginas secundarias
-const Dashboard = lazy(() => import('./pages/Dashboard'));
-const Salas = lazy(() => import('./pages/Salas'));
-const Torneos = lazy(() => import('./pages/Torneos'));
-const TorneoDetalle = lazy(() => import('./pages/TorneoDetalle'));
-const MisTorneos = lazy(() => import('./pages/MisTorneos'));
-const Estadisticas = lazy(() => import('./pages/Estadisticas'));
-const Rankings = lazy(() => import('./pages/Rankings'));
-const RankingsCategorias = lazy(() => import('./pages/RankingsCategorias'));
-const Confirmaciones = lazy(() => import('./pages/Confirmaciones'));
-const MiPerfil = lazy(() => import('./pages/MiPerfil'));
-const EditarPerfil = lazy(() => import('./pages/EditarPerfil'));
-const MiRanking = lazy(() => import('./pages/MiRanking'));
-const CompletarPerfil = lazy(() => import('./pages/CompletarPerfil'));
-const PerfilPublico = lazy(() => import('./pages/PerfilPublico'));
-const BuscarJugadores = lazy(() => import('./pages/BuscarJugadores'));
-const AdminPanel = lazy(() => import('./pages/AdminPanel'));
-const RankingCircuito = lazy(() => import('./pages/RankingCircuito'));
-const DebugAuth = lazy(() => import('./pages/DebugAuth'));
+// const Dashboard = lazy(() => import('./pages/Dashboard').then((m) => { console.log('Dashboard module:', m); return m; }));
+const Salas = lazy(() => import('./pages/Salas').then((m) => { console.log('Salas module:', m); return m; }));
+const Torneos = lazy(() => import('./pages/Torneos').then((m) => { console.log('Torneos module:', m); return m; }));
+const TorneoDetalle = lazy(() => import('./pages/TorneoDetalle').then((m) => { console.log('TorneoDetalle module:', m); return m; }));
+const MisTorneos = lazy(() => import('./pages/MisTorneos').then((m) => { console.log('MisTorneos module:', m); return m; }));
+const Estadisticas = lazy(() => import('./pages/Estadisticas').then((m) => { console.log('Estadisticas module:', m); return m; }));
+const Rankings = lazy(() => import('./pages/Rankings').then((m) => { console.log('Rankings module:', m); return m; }));
+const RankingsCategorias = lazy(() => import('./pages/RankingsCategorias').then((m) => { console.log('RankingsCategorias module:', m); return m; }));
+const Confirmaciones = lazy(() => import('./pages/Confirmaciones').then((m) => { console.log('Confirmaciones module:', m); return m; }));
+const MiPerfil = lazy(() => import('./pages/MiPerfil').then((m) => { console.log('MiPerfil module:', m); return m; }));
+const EditarPerfil = lazy(() => import('./pages/EditarPerfil').then((m) => { console.log('EditarPerfil module:', m); return m; }));
+const MiRanking = lazy(() => import('./pages/MiRanking').then((m) => { console.log('MiRanking module:', m); return m; }));
+const CompletarPerfil = lazy(() => import('./pages/CompletarPerfil').then((m) => { console.log('CompletarPerfil module:', m); return m; }));
+const PerfilPublico = lazy(() => import('./pages/PerfilPublico').then((m) => { console.log('PerfilPublico module:', m); return m; }));
+const BuscarJugadores = lazy(() => import('./pages/BuscarJugadores').then((m) => { console.log('BuscarJugadores module:', m); return m; }));
+const AdminPanel = lazy(() => import('./pages/AdminPanel').then((m) => { console.log('AdminPanel module:', m); return m; }));
+const RankingCircuito = lazy(() => import('./pages/RankingCircuito').then((m) => { console.log('RankingCircuito module:', m); return m; }));
+const DebugAuth = lazy(() => import('./pages/DebugAuth').then((m) => { console.log('DebugAuth module:', m); return m; }));
 
 // Loading component
 const PageLoader = () => (
@@ -109,7 +109,6 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
-              <Route path="/cors-debug" element={<CorsDebugPage />} />
               <Route path="/debug-auth" element={<DebugAuth />} />
               
               {/* Ruta pública de ranking de circuito (para compartir en redes) */}

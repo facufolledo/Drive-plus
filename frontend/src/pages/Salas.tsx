@@ -165,7 +165,7 @@ export default function Salas() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="w-full min-w-0 space-y-6">
       {/* HEADER - Optimizado para móvil */}
       <motion.div
         initial={{ opacity: 0, y: -30 }}

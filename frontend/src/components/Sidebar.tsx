@@ -23,7 +23,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     {
       title: 'Principal',
       items: [
-        { icon: Home, label: 'Dashboard', path: '/dashboard' },
+        { icon: Home, label: 'Inicio', path: '/dashboard' },
       ]
     },
     {

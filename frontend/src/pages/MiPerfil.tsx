@@ -385,8 +385,8 @@ export default function MiPerfil() {
   const stats = calcularEstadisticasAvanzadas();
 
   return (
-    <div className="min-h-screen p-4 md:p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen p-4 md:p-6 w-full min-w-0">
+      <div className="w-full min-w-0">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6">
           
           {/* Panel Izquierdo - Perfil */}

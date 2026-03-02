@@ -105,7 +105,7 @@ export default function Rankings() {
   }, [totalPaginasCalculadas, paginaActual]);
 
   return (
-    <div className="space-y-8">
+    <div className="w-full min-w-0 space-y-8">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -30 }}

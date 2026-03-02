@@ -18,12 +18,12 @@ export default function Layout({ children }: LayoutProps) {
     <div className="min-h-screen bg-background relative overflow-hidden">
       <CursorTrail />
       
-      {/* Imagen de fondo de pádel con overlay */}
+      {/* Imagen de fondo: más blur y blackout para que el contenido sea protagonista */}
       <div className="fixed inset-0 z-0">
         <div
-          className="absolute inset-0"
+          className="absolute inset-0 backdrop-blur-md"
           style={{
-            backgroundImage: `linear-gradient(rgba(26, 31, 46, 0.88), rgba(26, 31, 46, 0.92)), url('https://i.ibb.co/wN0RJcvS/padel2.webp')`,
+            backgroundImage: `linear-gradient(rgba(15, 18, 28, 0.94), rgba(15, 18, 28, 0.97)), url('https://i.ibb.co/wN0RJcvS/padel2.webp')`,
             backgroundSize: "cover",
             backgroundPosition: "center",
             backgroundRepeat: "no-repeat",
@@ -37,7 +37,7 @@ export default function Layout({ children }: LayoutProps) {
       <div className="flex pt-16 relative z-10 min-h-screen">
         <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-        <main className="flex-1 p-3 md:p-4 lg:p-8 lg:ml-64 w-full overflow-x-hidden">
+        <main className="flex-1 min-w-0 px-4 py-4 md:px-6 md:py-5 lg:px-8 lg:py-6 w-full overflow-x-hidden">
           <AnimatePresence mode="wait">
             <motion.div
               key={location.pathname}
@@ -49,7 +49,7 @@ export default function Layout({ children }: LayoutProps) {
                 ease: 'anticipate',
                 duration: 0.3
               }}
-              className="w-full"
+              className="w-full max-w-[1600px] mx-auto"
             >
               {children}
             </motion.div>

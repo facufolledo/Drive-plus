@@ -247,7 +247,7 @@ export default function PerfilPublico() {
   if (loading) {
     return (
       <div className="min-h-screen p-4 md:p-6">
-        <div className="max-w-7xl mx-auto">
+        <div className="w-full min-w-0">
           <LoadingSkeleton variant="card" lines={10} />
         </div>
       </div>
@@ -281,8 +281,8 @@ export default function PerfilPublico() {
   const partidosAmistosos = partidos.filter(p => p.tipo === 'amistoso' || !p.tipo).length;
 
   return (
-    <div className="min-h-screen p-4 md:p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen p-4 md:p-6 w-full min-w-0">
+      <div className="w-full min-w-0">
         {/* Header con navegación */}
         <div className="flex items-center justify-between mb-6">
           <Button variant="ghost" onClick={() => navigate(-1)}>
