@@ -35,6 +35,7 @@ from src.controllers.logs_controller import router as logs_router
 from src.controllers.admin_controller import router as admin_router
 from src.controllers.categoria_maintenance_controller import router as categoria_maintenance_router
 from src.controllers.circuito_controller import router as circuito_router
+from src.controllers.dashboard_controller import router as dashboard_router
 
 
 # ---- Lifespan (startup/shutdown) ----
@@ -137,6 +138,7 @@ app.include_router(logs_router)
 app.include_router(admin_router)
 app.include_router(categoria_maintenance_router)
 app.include_router(circuito_router)
+app.include_router(dashboard_router)
 
 # ---- Endpoints básicos ----
 @app.get("/")
