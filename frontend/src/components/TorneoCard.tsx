@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Trophy, Calendar, Users, Play, CheckCircle, Clock } from 'lucide-react';
 import { Torneo } from '../utils/types';
 import Button from './Button';
+import { useAuth } from '../context/AuthContext';
 
 interface TorneoCardProps {
   torneo: Torneo;
@@ -26,6 +27,10 @@ const GENERO_LABELS: Record<string, { label: string; icon: string; color: string
 const TorneoCard = forwardRef<HTMLDivElement, TorneoCardProps>(({ torneo }, ref) => {
   const navigate = useNavigate();
   const shouldReduceMotion = useReducedMotion();
+  const { usuario } = useAuth();
+  
+  // Verificar si el usuario es administrador
+  const esAdmin = usuario?.es_administrador === true;
   
   // Helper para parsear fechas sin problemas de zona horaria
   const parseFechaSinZonaHoraria = (fechaISO: string): Date => {
@@ -105,17 +110,22 @@ const TorneoCard = forwardRef<HTMLDivElement, TorneoCardProps>(({ torneo }, ref)
               </span>
             </div>
             
-            <div className="flex items-center gap-1 md:gap-2 text-textSecondary">
-              <Users size={10} className="flex-shrink-0 md:w-4 md:h-4" />
-              <span className="text-[9px] md:text-sm">
-                {torneo.participantes || 0} parejas
-              </span>
-            </div>
+            {/* Parejas inscriptas - Solo visible para administradores */}
+            {esAdmin && (
+              <div className="flex items-center gap-1 md:gap-2 text-textSecondary">
+                <Users size={10} className="flex-shrink-0 md:w-4 md:h-4" />
+                <span className="text-[9px] md:text-sm">
+                  {torneo.participantes || 0} parejas
+                </span>
+              </div>
+            )}
 
             {/* Categoría y Género */}
             <div className="flex items-center gap-1 md:gap-2 flex-wrap">
               <span className="px-1.5 md:px-3 py-0.5 md:py-1 rounded-full bg-primary/10 text-primary text-[8px] md:text-xs font-bold">
-                {torneo.categoria || 'Sin categoría'}
+                {torneo.total_categorias && torneo.total_categorias > 1 
+                  ? 'Categorías Varias' 
+                  : torneo.categoria || 'Sin categoría'}
               </span>
               {torneo.genero && GENERO_LABELS[torneo.genero] && (
                 <span className={`px-1.5 md:px-3 py-0.5 md:py-1 rounded-full bg-gradient-to-r ${GENERO_LABELS[torneo.genero].color} text-white text-[8px] md:text-xs font-bold`}>

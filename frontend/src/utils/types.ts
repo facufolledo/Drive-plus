@@ -61,6 +61,7 @@ export interface Torneo {
   ganadorId?: string;
   createdAt: string;
   lugar?: string;
+  total_categorias?: number;
 }
 
 // Tipos específicos para torneos del backend
