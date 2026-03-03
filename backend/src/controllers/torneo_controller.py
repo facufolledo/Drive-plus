@@ -266,20 +266,38 @@ def listar_torneos(
         torneos = query.order_by(Torneo.created_at.desc()).offset(skip).limit(limit).all()
         
         # Conteo de parejas en una sola query (evitar N+1)
-        from ..models.torneo_models import TorneoPareja
+        from ..models.torneo_models import TorneoPareja, TorneoCategoria
         from sqlalchemy import func
         torneo_ids = [t.id for t in torneos]
         parejas_por_torneo = {}
+        categorias_por_torneo = {}
+        
         if torneo_ids:
             counts = db.query(TorneoPareja.torneo_id, func.count(TorneoPareja.id)).filter(
                 TorneoPareja.torneo_id.in_(torneo_ids),
                 TorneoPareja.estado.in_(['inscripta', 'confirmada'])
             ).group_by(TorneoPareja.torneo_id).all()
             parejas_por_torneo = {tid: c for tid, c in counts}
+            
+            # Obtener categorías de todos los torneos
+            categorias = db.query(TorneoCategoria).filter(
+                TorneoCategoria.torneo_id.in_(torneo_ids)
+            ).order_by(TorneoCategoria.orden).all()
+            
+            for cat in categorias:
+                if cat.torneo_id not in categorias_por_torneo:
+                    categorias_por_torneo[cat.torneo_id] = []
+                categorias_por_torneo[cat.torneo_id].append({
+                    "nombre": cat.nombre,
+                    "genero": cat.genero
+                })
         
         resultado = []
         for torneo in torneos:
             parejas_count = parejas_por_torneo.get(torneo.id, 0)
+            categorias = categorias_por_torneo.get(torneo.id, [])
+            total_categorias = len(categorias)
+            
             resultado.append({
                 "id": torneo.id,
                 "nombre": torneo.nombre,
@@ -293,6 +311,9 @@ def listar_torneos(
                 "lugar": torneo.lugar,
                 "created_at": torneo.created_at.isoformat() if torneo.created_at else None,
                 "parejas_inscritas": parejas_count,
+                # Categorías del torneo
+                "categorias": categorias,
+                "total_categorias": total_categorias,
                 # Campos de pago
                 "requiere_pago": torneo.requiere_pago or False,
                 "monto_inscripcion": float(torneo.monto_inscripcion) if torneo.monto_inscripcion else 0,

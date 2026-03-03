@@ -148,19 +148,78 @@ const TorneoCard = forwardRef<HTMLDivElement, TorneoCardProps>(({ torneo }, ref)
             )}
 
             {/* Categoría y Género */}
-            <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
-              <span className="px-2 md:px-3 py-1 md:py-1.5 rounded-full bg-primary/10 text-primary text-[9px] md:text-xs font-bold">
-                {torneo.total_categorias && torneo.total_categorias > 1 
-                  ? 'Categorías Varias' 
-                  : torneo.categoria || 'Sin categoría'}
-              </span>
-              {torneo.genero && GENERO_LABELS[torneo.genero] && (
-                <span className={`px-2 md:px-3 py-1 md:py-1.5 rounded-full bg-gradient-to-r ${GENERO_LABELS[torneo.genero].color} text-white text-[9px] md:text-xs font-bold`}>
-                  {GENERO_LABELS[torneo.genero].icon}
-                </span>
+            <div className="flex flex-col gap-1.5">
+              {/* Si tiene categorías, mostrarlas separadas por género */}
+              {torneo.categorias && torneo.categorias.length > 0 ? (
+                <>
+                  {/* Categorías Masculinas */}
+                  {torneo.categorias.filter(c => c.genero === 'masculino').length > 0 && (
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <span className="text-[9px] md:text-xs text-blue-400 font-bold">♂</span>
+                      {torneo.categorias
+                        .filter(c => c.genero === 'masculino')
+                        .map((cat, idx) => (
+                          <span
+                            key={`masc-${idx}`}
+                            className="px-1.5 md:px-2 py-0.5 md:py-1 rounded-full bg-blue-500/10 text-blue-400 text-[8px] md:text-[10px] font-bold"
+                          >
+                            {cat.nombre}
+                          </span>
+                        ))}
+                    </div>
+                  )}
+                  
+                  {/* Categorías Femeninas */}
+                  {torneo.categorias.filter(c => c.genero === 'femenino').length > 0 && (
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <span className="text-[9px] md:text-xs text-pink-400 font-bold">♀</span>
+                      {torneo.categorias
+                        .filter(c => c.genero === 'femenino')
+                        .map((cat, idx) => (
+                          <span
+                            key={`fem-${idx}`}
+                            className="px-1.5 md:px-2 py-0.5 md:py-1 rounded-full bg-pink-500/10 text-pink-400 text-[8px] md:text-[10px] font-bold"
+                          >
+                            {cat.nombre}
+                          </span>
+                        ))}
+                    </div>
+                  )}
+                  
+                  {/* Categorías Mixtas */}
+                  {torneo.categorias.filter(c => c.genero === 'mixto').length > 0 && (
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <span className="text-[9px] md:text-xs text-purple-400 font-bold">⚥</span>
+                      {torneo.categorias
+                        .filter(c => c.genero === 'mixto')
+                        .map((cat, idx) => (
+                          <span
+                            key={`mixto-${idx}`}
+                            className="px-1.5 md:px-2 py-0.5 md:py-1 rounded-full bg-purple-500/10 text-purple-400 text-[8px] md:text-[10px] font-bold"
+                          >
+                            {cat.nombre}
+                          </span>
+                        ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                /* Fallback: mostrar categoría única si no hay array de categorías */
+                <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
+                  <span className="px-2 md:px-3 py-1 md:py-1.5 rounded-full bg-primary/10 text-primary text-[9px] md:text-xs font-bold">
+                    {torneo.categoria || 'Sin categoría'}
+                  </span>
+                  {torneo.genero && GENERO_LABELS[torneo.genero] && (
+                    <span className={`px-2 md:px-3 py-1 md:py-1.5 rounded-full bg-gradient-to-r ${GENERO_LABELS[torneo.genero].color} text-white text-[9px] md:text-xs font-bold`}>
+                      {GENERO_LABELS[torneo.genero].icon}
+                    </span>
+                  )}
+                </div>
               )}
+              
+              {/* Formato */}
               {torneo.formato && FORMATO_LABELS[torneo.formato] && (
-                <span className="text-[9px] md:text-xs text-textSecondary truncate">
+                <span className="text-[9px] md:text-xs text-textSecondary">
                   {FORMATO_LABELS[torneo.formato]}
                 </span>
               )}

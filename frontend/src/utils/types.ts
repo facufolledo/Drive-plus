@@ -62,6 +62,10 @@ export interface Torneo {
   createdAt: string;
   lugar?: string;
   total_categorias?: number;
+  categorias?: Array<{
+    nombre: string;
+    genero: string;
+  }>;
 }
 
 // Tipos específicos para torneos del backend
