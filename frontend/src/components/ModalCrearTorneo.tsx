@@ -669,7 +669,7 @@ export default function ModalCrearTorneo({ isOpen, onClose }: ModalCrearTorneoPr
                               const h = Math.floor(i / 2);
                               const m = i % 2 === 0 ? '00' : '30';
                               return `${h.toString().padStart(2, '0')}:${m}`;
-                            }).map(hora => (
+                            }).concat(['23:59']).map(hora => (
                               <option key={hora} value={hora}>{hora}</option>
                             ))}
                           </select>
@@ -691,7 +691,7 @@ export default function ModalCrearTorneo({ isOpen, onClose }: ModalCrearTorneoPr
                               const h = Math.floor(i / 2);
                               const m = i % 2 === 0 ? '00' : '30';
                               return `${h.toString().padStart(2, '0')}:${m}`;
-                            }).filter(hora => hora > horario.desde).map(hora => (
+                            }).concat(['23:59']).filter(hora => hora > horario.desde).map(hora => (
                               <option key={hora} value={hora}>{hora}</option>
                             ))}
                           </select>
@@ -747,7 +747,7 @@ export default function ModalCrearTorneo({ isOpen, onClose }: ModalCrearTorneoPr
                               const h = Math.floor(i / 2);
                               const m = i % 2 === 0 ? '00' : '30';
                               return `${h.toString().padStart(2, '0')}:${m}`;
-                            }).map(hora => (
+                            }).concat(['23:59']).map(hora => (
                               <option key={hora} value={hora}>{hora}</option>
                             ))}
                           </select>
@@ -769,7 +769,7 @@ export default function ModalCrearTorneo({ isOpen, onClose }: ModalCrearTorneoPr
                               const h = Math.floor(i / 2);
                               const m = i % 2 === 0 ? '00' : '30';
                               return `${h.toString().padStart(2, '0')}:${m}`;
-                            }).filter(hora => hora > horario.desde).map(hora => (
+                            }).concat(['23:59']).filter(hora => hora > horario.desde).map(hora => (
                               <option key={hora} value={hora}>{hora}</option>
                             ))}
                           </select>
