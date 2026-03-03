@@ -41,7 +41,12 @@ export default function Torneos() {
     torneosFiltrados = torneosFiltrados.filter(t => t.genero === filtroGenero);
   }
 
-  const torneosMostrados = mostrarTodos ? torneosFiltrados : torneosFiltrados.slice(0, ITEMS_POR_PAGINA);
+  // Separar torneos activos/programados de finalizados
+  const torneosActivos_Programados = torneosFiltrados.filter(t => t.estado === 'activo' || t.estado === 'programado');
+  const torneosFinalizadosFiltrados = torneosFiltrados.filter(t => t.estado === 'finalizado');
+
+  const torneosActivosMostrados = mostrarTodos ? torneosActivos_Programados : torneosActivos_Programados.slice(0, ITEMS_POR_PAGINA);
+  const torneosFinalizadosMostrados = mostrarTodos ? torneosFinalizadosFiltrados : torneosFinalizadosFiltrados.slice(0, ITEMS_POR_PAGINA);
 
   return (
     <div className="w-full min-w-0 space-y-8">
@@ -191,33 +196,86 @@ export default function Torneos() {
           </div>
         </Card>
       ) : (
-        <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-4">
-            <AnimatePresence mode="popLayout">
-              {torneosMostrados.map((torneo) => (
-                <TorneoCard
-                  key={torneo.id}
-                  torneo={torneo}
-                />
-              ))}
-            </AnimatePresence>
-          </div>
+        <div className="space-y-8">
+          {/* Torneos Activos y Programados */}
+          {torneosActivos_Programados.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="h-1 w-12 bg-gradient-to-r from-primary to-secondary rounded-full" />
+                <h2 className="text-xl md:text-2xl font-black text-textPrimary">
+                  Torneos Activos
+                </h2>
+                <span className="px-2 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold">
+                  {torneosActivos_Programados.length}
+                </span>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-4">
+                <AnimatePresence mode="popLayout">
+                  {torneosActivosMostrados.map((torneo) => (
+                    <TorneoCard
+                      key={torneo.id}
+                      torneo={torneo}
+                    />
+                  ))}
+                </AnimatePresence>
+              </div>
 
-          {/* Botón Cargar Más */}
-          {!mostrarTodos && torneosFiltrados.length > ITEMS_POR_PAGINA && (
-            <div className="mt-4 md:mt-6 text-center">
-              <Button
-                variant="accent"
-                onClick={() => setMostrarTodos(true)}
-                className="w-full md:w-auto"
-              >
-                Cargar más ({torneosFiltrados.length - ITEMS_POR_PAGINA} restantes)
-              </Button>
+              {!mostrarTodos && torneosActivos_Programados.length > ITEMS_POR_PAGINA && (
+                <div className="mt-4 text-center">
+                  <Button
+                    variant="accent"
+                    onClick={() => setMostrarTodos(true)}
+                    className="w-full md:w-auto"
+                  >
+                    Ver más ({torneosActivos_Programados.length - ITEMS_POR_PAGINA} restantes)
+                  </Button>
+                </div>
+              )}
             </div>
           )}
 
-          {mostrarTodos && torneosFiltrados.length > ITEMS_POR_PAGINA && (
-            <div className="mt-4 md:mt-6 text-center">
+          {/* Torneos Finalizados */}
+          {torneosFinalizadosFiltrados.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="h-1 w-12 bg-gradient-to-r from-accent to-yellow-500 rounded-full" />
+                <h2 className="text-xl md:text-2xl font-black text-textPrimary">
+                  Torneos Finalizados
+                </h2>
+                <span className="px-2 py-1 rounded-full bg-accent/10 text-accent text-xs font-bold">
+                  {torneosFinalizadosFiltrados.length}
+                </span>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-4">
+                <AnimatePresence mode="popLayout">
+                  {torneosFinalizadosMostrados.map((torneo) => (
+                    <TorneoCard
+                      key={torneo.id}
+                      torneo={torneo}
+                    />
+                  ))}
+                </AnimatePresence>
+              </div>
+
+              {!mostrarTodos && torneosFinalizadosFiltrados.length > ITEMS_POR_PAGINA && (
+                <div className="mt-4 text-center">
+                  <Button
+                    variant="ghost"
+                    onClick={() => setMostrarTodos(true)}
+                    className="w-full md:w-auto"
+                  >
+                    Ver más ({torneosFinalizadosFiltrados.length - ITEMS_POR_PAGINA} restantes)
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Botón Mostrar Menos */}
+          {mostrarTodos && (torneosActivos_Programados.length > ITEMS_POR_PAGINA || torneosFinalizadosFiltrados.length > ITEMS_POR_PAGINA) && (
+            <div className="text-center">
               <Button
                 variant="ghost"
                 onClick={() => {
@@ -230,7 +288,7 @@ export default function Torneos() {
               </Button>
             </div>
           )}
-        </>
+        </div>
       )}
 
       {/* Modal */}
