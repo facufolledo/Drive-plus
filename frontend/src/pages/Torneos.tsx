@@ -14,7 +14,7 @@ export default function Torneos() {
   const { torneos, misTorneos, puedeCrearTorneos, esAdministrador, loading } = useTorneos();
   const { usuario } = useAuth();
   const [modalCrearOpen, setModalCrearOpen] = useState(false);
-  const [filtro, setFiltro] = useState<'todos' | 'activo' | 'programado' | 'finalizado' | 'mis-torneos'>('todos');
+  const [filtro, setFiltro] = useState<'todos' | 'activo' | 'programado' | 'finalizado'>('todos');
   const [filtroGenero, setFiltroGenero] = useState<'todos' | 'masculino' | 'femenino' | 'mixto'>('todos');
   const [mostrarTodos, setMostrarTodos] = useState(false);
   const ITEMS_POR_PAGINA = 20;
@@ -32,8 +32,6 @@ export default function Torneos() {
   // Filtrar por estado
   let torneosFiltrados = filtro === 'todos' 
     ? torneos 
-    : filtro === 'mis-torneos'
-    ? misTorneosFiltrados
     : torneos.filter(t => t.estado === filtro);
 
   // Filtrar por género
@@ -85,80 +83,90 @@ export default function Torneos() {
       {/* Invitaciones pendientes */}
       <InvitacionesPendientes />
 
-      {/* Estadísticas compactas */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-        {[
-          { label: 'Total', value: torneos.length, color: 'from-cyan-500 to-blue-500', icon: '🏆' },
-          { label: 'Mis Torneos', value: misTorneosFiltrados.length, color: 'from-green-500 to-emerald-500', icon: '👤' },
-          { label: 'En Curso', value: torneosActivos.length, color: 'from-secondary to-pink-500', icon: '⚡' },
-          { label: 'Programados', value: torneosProgramados.length, color: 'from-primary to-blue-500', icon: '📅' },
-          { label: 'Finalizados', value: torneosFinalizados.length, color: 'from-accent to-yellow-400', icon: '✅' }
-        ].map((stat, index) => (
-          <motion.div
-            key={stat.label}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: index * 0.03 }}
-            className="group relative"
-          >
-            <div className="bg-cardBg rounded-lg p-2 md:p-2.5 border border-cardBorder group-hover:border-transparent transition-all duration-200 relative overflow-hidden">
-              <div className={`absolute -inset-[1px] bg-gradient-to-br ${stat.color} opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-lg -z-10 blur-sm`} />
-              
-              <div className="flex items-center justify-between mb-0.5 md:mb-1">
-                <span className="text-sm md:text-base">{stat.icon}</span>
-                <p className="text-xl md:text-2xl font-black text-textPrimary tracking-tight">
-                  {stat.value}
-                </p>
-              </div>
-              <p className="text-textSecondary text-[8px] md:text-[9px] font-bold uppercase tracking-wider">{stat.label}</p>
+      {/* Hero Stats - Barra compacta */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="bg-gradient-to-br from-cardBg to-cardBg/50 backdrop-blur-sm rounded-xl border border-cardBorder p-4 md:p-6"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-4 md:gap-6 text-sm md:text-base">
+            <div className="flex items-center gap-2">
+              <span className="text-textSecondary">Total:</span>
+              <span className="font-black text-textPrimary text-lg md:text-xl">{torneos.length}</span>
             </div>
-          </motion.div>
-        ))}
-      </div>
-
-      {/* Filtros compactos */}
-      <div className="space-y-2">
-        {/* Filtro por Estado */}
-        <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
-          <div className="flex items-center gap-1 md:gap-1.5 text-textSecondary">
-            <Filter size={12} className="md:w-3.5 md:h-3.5" />
-            <span className="text-[10px] md:text-xs font-bold">Estado:</span>
+            <div className="h-4 w-px bg-cardBorder hidden sm:block" />
+            <div className="flex items-center gap-2">
+              <span className="text-textSecondary">Mis Torneos:</span>
+              <span className="font-black text-green-400 text-lg md:text-xl">{misTorneosFiltrados.length}</span>
+            </div>
+            <div className="h-4 w-px bg-cardBorder hidden sm:block" />
+            <div className="flex items-center gap-2">
+              <span className="text-textSecondary">En Curso:</span>
+              <span className="font-black text-secondary text-lg md:text-xl">{torneosActivos.length}</span>
+              {torneosActivos.length > 0 && <span className="text-secondary">🔥</span>}
+            </div>
+            <div className="h-4 w-px bg-cardBorder hidden sm:block" />
+            <div className="flex items-center gap-2">
+              <span className="text-textSecondary">Programados:</span>
+              <span className="font-black text-primary text-lg md:text-xl">{torneosProgramados.length}</span>
+            </div>
+            <div className="h-4 w-px bg-cardBorder hidden sm:block" />
+            <div className="flex items-center gap-2">
+              <span className="text-textSecondary">Finalizados:</span>
+              <span className="font-black text-accent text-lg md:text-xl">{torneosFinalizados.length}</span>
+            </div>
           </div>
-          {(['todos', 'mis-torneos', 'activo', 'programado', 'finalizado'] as const).map((f) => (
-            <Button
-              key={f}
-              variant={filtro === f ? 'accent' : 'secondary'}
-              onClick={() => setFiltro(f)}
-              className={`text-[10px] md:text-xs px-2 md:px-2.5 py-0.5 md:py-1 ${f === 'mis-torneos' ? 'flex items-center gap-1' : ''}`}
-            >
-              {f === 'mis-torneos' && <User size={12} />}
-              {f === 'todos' ? 'Todos' : f === 'mis-torneos' ? 'Mis Torneos' : f === 'activo' ? 'En Curso' : f === 'programado' ? 'Programados' : 'Finalizados'}
-            </Button>
-          ))}
+        </div>
+      </motion.div>
+
+      {/* Filtros compactos tipo pills */}
+      <div className="space-y-3">
+        {/* Filtro por Estado */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="text-textSecondary text-sm font-medium">Estado:</span>
+          <div className="flex gap-2">
+            {(['todos', 'activo', 'programado', 'finalizado'] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setFiltro(f)}
+                className={`px-3 md:px-4 py-1.5 rounded-full text-xs md:text-sm font-medium transition-all ${
+                  filtro === f
+                    ? 'bg-accent text-black shadow-lg shadow-accent/20'
+                    : 'bg-cardBg text-textSecondary hover:bg-cardBorder border border-cardBorder'
+                }`}
+              >
+                {f === 'todos' ? 'Todos' : f === 'activo' ? 'En Curso' : f === 'programado' ? 'Programados' : 'Finalizados'}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Filtro por Género */}
-        <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
-          <div className="flex items-center gap-1 md:gap-1.5 text-textSecondary">
-            <Filter size={12} className="md:w-3.5 md:h-3.5" />
-            <span className="text-[10px] md:text-xs font-bold">Género:</span>
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="text-textSecondary text-sm font-medium">Género:</span>
+          <div className="flex gap-2">
+            {[
+              { value: 'todos', label: 'Todos', icon: '🏆' },
+              { value: 'masculino', label: 'Masculino', icon: '♂' },
+              { value: 'femenino', label: 'Femenino', icon: '♀' },
+              { value: 'mixto', label: 'Mixto', icon: '⚥' }
+            ].map((g) => (
+              <button
+                key={g.value}
+                onClick={() => setFiltroGenero(g.value as any)}
+                className={`px-3 md:px-4 py-1.5 rounded-full text-xs md:text-sm font-medium transition-all flex items-center gap-1.5 ${
+                  filtroGenero === g.value
+                    ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                    : 'bg-cardBg text-textSecondary hover:bg-cardBorder border border-cardBorder'
+                }`}
+              >
+                <span>{g.icon}</span>
+                <span className="hidden sm:inline">{g.label}</span>
+              </button>
+            ))}
           </div>
-          {[
-            { value: 'todos', label: 'Todos', icon: '🏆' },
-            { value: 'masculino', label: 'Masculino', icon: '♂' },
-            { value: 'femenino', label: 'Femenino', icon: '♀' },
-            { value: 'mixto', label: 'Mixto', icon: '⚥' }
-          ].map((g) => (
-            <Button
-              key={g.value}
-              variant={filtroGenero === g.value ? 'accent' : 'secondary'}
-              onClick={() => setFiltroGenero(g.value as any)}
-              className="text-[10px] md:text-xs px-2 md:px-2.5 py-0.5 md:py-1 flex items-center gap-1"
-            >
-              <span className="text-xs md:text-sm">{g.icon}</span>
-              <span className="hidden sm:inline">{g.label}</span>
-            </Button>
-          ))}
         </div>
       </div>
 

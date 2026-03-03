@@ -86,6 +86,9 @@ export function TorneosProvider({ children }: { children: ReactNode }) {
       participantes: torneoBackend.parejas_inscritas || torneoBackend.total_parejas || 0,
       salasIds: torneoBackend.salasIds || [],
       createdAt: torneoBackend.created_at || '',
+      // Categorías del torneo
+      categorias: torneoBackend.categorias || [],
+      total_categorias: torneoBackend.total_categorias || 0,
       // Guardar estado original y creador para verificaciones
       estado_original: torneoBackend.estado,
       creado_por: torneoBackend.creado_por,

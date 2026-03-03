@@ -343,31 +343,27 @@ async def obtener_mis_torneos(
     current_user: Usuario = Depends(get_current_user)
 ):
     """
-    Obtiene los torneos donde el usuario está inscripto (como jugador1 o jugador2)
+    Obtiene los torneos creados por el usuario y aquellos donde está inscripto
     """
     from ..models.torneo_models import TorneoPareja, Torneo
     from sqlalchemy import or_
     
     try:
-        # Buscar parejas donde el usuario participa
+        # 1. Torneos creados por el usuario
+        torneos_creados = db.query(Torneo).filter(
+            Torneo.creado_por == current_user.id_usuario
+        ).all()
+        
+        # 2. Buscar parejas donde el usuario participa
         parejas = db.query(TorneoPareja).filter(
             or_(
                 TorneoPareja.jugador1_id == current_user.id_usuario,
                 TorneoPareja.jugador2_id == current_user.id_usuario
             ),
-            TorneoPareja.estado.in_(['inscripta', 'confirmada'])  # Removido 'pendiente' que no existe en el enum
+            TorneoPareja.estado.in_(['inscripta', 'confirmada'])
         ).all()
         
-        if not parejas:
-            return {"torneos": []}
-        
-        # Obtener IDs únicos de torneos
-        torneo_ids = list(set(p.torneo_id for p in parejas))
-        
-        # Obtener info de los torneos
-        torneos = db.query(Torneo).filter(Torneo.id.in_(torneo_ids)).all()
-        
-        # Crear dict de parejas por torneo para incluir estado de inscripción
+        # Crear dict de parejas por torneo
         parejas_por_torneo = {}
         for p in parejas:
             parejas_por_torneo[p.torneo_id] = {
@@ -376,10 +372,18 @@ async def obtener_mis_torneos(
                 "categoria_id": p.categoria_id
             }
         
-        resultado = []
-        for torneo in torneos:
+        # Obtener torneos donde está inscrito (que no haya creado)
+        torneo_ids_inscrito = list(set(p.torneo_id for p in parejas))
+        torneos_inscrito = db.query(Torneo).filter(
+            Torneo.id.in_(torneo_ids_inscrito),
+            Torneo.creado_por != current_user.id_usuario  # Excluir los que ya están en creados
+        ).all() if torneo_ids_inscrito else []
+        
+        # Formatear torneos creados
+        resultado_creados = []
+        for torneo in torneos_creados:
             info_pareja = parejas_por_torneo.get(torneo.id, {})
-            resultado.append({
+            resultado_creados.append({
                 "id": torneo.id,
                 "nombre": torneo.nombre,
                 "descripcion": torneo.descripcion,
@@ -390,10 +394,33 @@ async def obtener_mis_torneos(
                 "fecha_inicio": torneo.fecha_inicio.isoformat() if torneo.fecha_inicio else None,
                 "fecha_fin": torneo.fecha_fin.isoformat() if torneo.fecha_fin else None,
                 "lugar": torneo.lugar,
-                "mi_inscripcion": info_pareja
+                "mi_inscripcion": info_pareja,
+                "soy_creador": True
             })
         
-        return {"torneos": resultado}
+        # Formatear torneos donde está inscrito
+        resultado_inscrito = []
+        for torneo in torneos_inscrito:
+            info_pareja = parejas_por_torneo.get(torneo.id, {})
+            resultado_inscrito.append({
+                "id": torneo.id,
+                "nombre": torneo.nombre,
+                "descripcion": torneo.descripcion,
+                "tipo": torneo.tipo.value if hasattr(torneo.tipo, 'value') else str(torneo.tipo),
+                "categoria": torneo.categoria,
+                "genero": torneo.genero or 'masculino',
+                "estado": torneo.estado.value if hasattr(torneo.estado, 'value') else str(torneo.estado),
+                "fecha_inicio": torneo.fecha_inicio.isoformat() if torneo.fecha_inicio else None,
+                "fecha_fin": torneo.fecha_fin.isoformat() if torneo.fecha_fin else None,
+                "lugar": torneo.lugar,
+                "mi_inscripcion": info_pareja,
+                "soy_creador": False
+            })
+        
+        return {
+            "torneos_creados": resultado_creados,
+            "torneos_inscrito": resultado_inscrito
+        }
     except Exception as e:
         import traceback
         traceback.print_exc()
