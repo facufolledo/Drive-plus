@@ -47,22 +47,22 @@ export default function Torneos() {
   const torneosFinalizadosMostrados = mostrarTodos ? torneosFinalizadosFiltrados : torneosFinalizadosFiltrados.slice(0, ITEMS_POR_PAGINA);
 
   return (
-    <div className="w-full min-w-0 space-y-8">
-      {/* Header */}
+    <div className="w-full min-w-0 space-y-6">
+      {/* Header compacto */}
       <motion.div
-        initial={{ opacity: 0, y: -30 }}
+        initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 md:gap-4"
+        transition={{ duration: 0.3 }}
+        className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3"
       >
-        <div className="relative">
-          <div className="flex items-center gap-2 md:gap-3 mb-1 md:mb-2">
-            <div className="h-0.5 md:h-1 w-8 md:w-12 bg-gradient-to-r from-accent to-yellow-500 rounded-full" />
-            <h1 className="text-2xl md:text-5xl font-black text-textPrimary tracking-tight">
+        <div>
+          <div className="flex items-center gap-2 md:gap-3 mb-1">
+            <div className="h-0.5 md:h-1 w-8 md:w-10 bg-gradient-to-r from-accent to-yellow-500 rounded-full" />
+            <h1 className="text-2xl md:text-4xl font-black text-textPrimary tracking-tight">
               Torneos
             </h1>
           </div>
-          <p className="text-textSecondary text-xs md:text-base ml-10 md:ml-15">Organiza y gestiona competencias</p>
+          <p className="text-textSecondary text-xs md:text-sm ml-10 md:ml-13">Organiza y gestiona competencias</p>
         </div>
         {puedeCrear && (
           <motion.div
@@ -83,92 +83,105 @@ export default function Torneos() {
       {/* Invitaciones pendientes */}
       <InvitacionesPendientes />
 
-      {/* Hero Stats - Barra compacta */}
+      {/* Hero Stats + Filtros - Todo en un bloque premium */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
-        className="bg-gradient-to-br from-cardBg to-cardBg/50 backdrop-blur-sm rounded-xl border border-cardBorder p-4 md:p-6"
+        className="relative overflow-hidden rounded-2xl p-5 md:p-7"
+        style={{
+          background: 'rgba(20, 25, 40, 0.6)',
+          backdropFilter: 'blur(12px)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
+        }}
       >
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-4 md:gap-6 text-sm md:text-base">
+        {/* Gradiente sutil de fondo */}
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 pointer-events-none" />
+        
+        <div className="relative space-y-5">
+          {/* Stats en línea */}
+          <div className="flex flex-wrap items-center gap-4 md:gap-8 text-sm md:text-base">
             <div className="flex items-center gap-2">
-              <span className="text-textSecondary">Total:</span>
-              <span className="font-black text-textPrimary text-lg md:text-xl">{torneos.length}</span>
+              <span className="text-textSecondary/80 text-xs md:text-sm">Total:</span>
+              <span className="font-black text-textPrimary text-xl md:text-2xl">{torneos.length}</span>
             </div>
-            <div className="h-4 w-px bg-cardBorder hidden sm:block" />
+            <div className="h-5 w-px bg-white/10 hidden sm:block" />
             <div className="flex items-center gap-2">
-              <span className="text-textSecondary">Mis Torneos:</span>
-              <span className="font-black text-green-400 text-lg md:text-xl">{misTorneosFiltrados.length}</span>
+              <span className="text-textSecondary/80 text-xs md:text-sm">Mis Torneos:</span>
+              <span className="font-black text-green-400 text-xl md:text-2xl">{misTorneosFiltrados.length}</span>
             </div>
-            <div className="h-4 w-px bg-cardBorder hidden sm:block" />
+            <div className="h-5 w-px bg-white/10 hidden sm:block" />
             <div className="flex items-center gap-2">
-              <span className="text-textSecondary">En Curso:</span>
-              <span className="font-black text-secondary text-lg md:text-xl">{torneosActivos.length}</span>
+              <span className="text-textSecondary/80 text-xs md:text-sm">En Curso:</span>
+              <span className="font-black text-secondary text-xl md:text-2xl">{torneosActivos.length}</span>
               {torneosActivos.length > 0 && <span className="text-secondary">🔥</span>}
             </div>
-            <div className="h-4 w-px bg-cardBorder hidden sm:block" />
+            <div className="h-5 w-px bg-white/10 hidden sm:block" />
             <div className="flex items-center gap-2">
-              <span className="text-textSecondary">Programados:</span>
-              <span className="font-black text-primary text-lg md:text-xl">{torneosProgramados.length}</span>
+              <span className="text-textSecondary/80 text-xs md:text-sm">Programados:</span>
+              <span className="font-black text-primary text-xl md:text-2xl">{torneosProgramados.length}</span>
             </div>
-            <div className="h-4 w-px bg-cardBorder hidden sm:block" />
+            <div className="h-5 w-px bg-white/10 hidden sm:block" />
             <div className="flex items-center gap-2">
-              <span className="text-textSecondary">Finalizados:</span>
-              <span className="font-black text-accent text-lg md:text-xl">{torneosFinalizados.length}</span>
+              <span className="text-textSecondary/80 text-xs md:text-sm">Finalizados:</span>
+              <span className="font-black text-accent text-xl md:text-2xl">{torneosFinalizados.length}</span>
+            </div>
+          </div>
+
+          {/* Línea divisoria sutil */}
+          <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+
+          {/* Filtros más sutiles y compactos */}
+          <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
+            {/* Filtro por Estado */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-textSecondary/60 text-xs font-medium uppercase tracking-wider">Estado:</span>
+              <div className="flex gap-1.5">
+                {(['todos', 'activo', 'programado', 'finalizado'] as const).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setFiltro(f)}
+                    className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+                      filtro === f
+                        ? 'bg-accent/90 text-black shadow-md'
+                        : 'bg-white/5 text-textSecondary/70 hover:bg-white/10 hover:text-textSecondary border border-white/5'
+                    }`}
+                  >
+                    {f === 'todos' ? 'Todos' : f === 'activo' ? 'En Curso' : f === 'programado' ? 'Programados' : 'Finalizados'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Filtro por Género */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-textSecondary/60 text-xs font-medium uppercase tracking-wider">Género:</span>
+              <div className="flex gap-1.5">
+                {[
+                  { value: 'todos', label: 'Todos', icon: '🏆' },
+                  { value: 'masculino', label: 'Masculino', icon: '♂' },
+                  { value: 'femenino', label: 'Femenino', icon: '♀' },
+                  { value: 'mixto', label: 'Mixto', icon: '⚥' }
+                ].map((g) => (
+                  <button
+                    key={g.value}
+                    onClick={() => setFiltroGenero(g.value as any)}
+                    className={`px-3 py-1 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+                      filtroGenero === g.value
+                        ? 'bg-primary/90 text-white shadow-md'
+                        : 'bg-white/5 text-textSecondary/70 hover:bg-white/10 hover:text-textSecondary border border-white/5'
+                    }`}
+                  >
+                    <span className="text-xs">{g.icon}</span>
+                    <span className="hidden sm:inline">{g.label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
       </motion.div>
-
-      {/* Filtros compactos tipo pills */}
-      <div className="space-y-3">
-        {/* Filtro por Estado */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <span className="text-textSecondary text-sm font-medium">Estado:</span>
-          <div className="flex gap-2">
-            {(['todos', 'activo', 'programado', 'finalizado'] as const).map((f) => (
-              <button
-                key={f}
-                onClick={() => setFiltro(f)}
-                className={`px-3 md:px-4 py-1.5 rounded-full text-xs md:text-sm font-medium transition-all ${
-                  filtro === f
-                    ? 'bg-accent text-black shadow-lg shadow-accent/20'
-                    : 'bg-cardBg text-textSecondary hover:bg-cardBorder border border-cardBorder'
-                }`}
-              >
-                {f === 'todos' ? 'Todos' : f === 'activo' ? 'En Curso' : f === 'programado' ? 'Programados' : 'Finalizados'}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Filtro por Género */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <span className="text-textSecondary text-sm font-medium">Género:</span>
-          <div className="flex gap-2">
-            {[
-              { value: 'todos', label: 'Todos', icon: '🏆' },
-              { value: 'masculino', label: 'Masculino', icon: '♂' },
-              { value: 'femenino', label: 'Femenino', icon: '♀' },
-              { value: 'mixto', label: 'Mixto', icon: '⚥' }
-            ].map((g) => (
-              <button
-                key={g.value}
-                onClick={() => setFiltroGenero(g.value as any)}
-                className={`px-3 md:px-4 py-1.5 rounded-full text-xs md:text-sm font-medium transition-all flex items-center gap-1.5 ${
-                  filtroGenero === g.value
-                    ? 'bg-primary text-white shadow-lg shadow-primary/20'
-                    : 'bg-cardBg text-textSecondary hover:bg-cardBorder border border-cardBorder'
-                }`}
-              >
-                <span>{g.icon}</span>
-                <span className="hidden sm:inline">{g.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
 
       {/* Lista de torneos */}
       {loading ? (
