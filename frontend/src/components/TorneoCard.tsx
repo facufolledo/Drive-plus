@@ -62,6 +62,19 @@ const TorneoCard = forwardRef<HTMLDivElement, TorneoCardProps>(({ torneo }, ref)
     }
   };
 
+  const getEstadoLabel = () => {
+    switch (torneo.estado) {
+      case 'activo':
+        return 'En Curso';
+      case 'finalizado':
+        return 'Finalizado';
+      case 'programado':
+        return 'Próximo';
+      default:
+        return '';
+    }
+  };
+
   return (
     <motion.div
       ref={ref}
@@ -84,14 +97,22 @@ const TorneoCard = forwardRef<HTMLDivElement, TorneoCardProps>(({ torneo }, ref)
                 <Trophy className="text-white" size={14} />
                 <Trophy className="text-white hidden md:block md:w-6 md:h-6" size={24} />
               </div>
-              <h3 className="text-xs md:text-base font-bold text-textPrimary group-hover:text-white transition-colors truncate">
-                {torneo.nombre}
-              </h3>
-            </div>
-            
-            {/* Estado badge */}
-            <div className={`flex items-center gap-0.5 md:gap-1.5 px-1.5 md:px-3 py-0.5 md:py-1 rounded-full bg-gradient-to-r ${getEstadoColor()} text-white flex-shrink-0`}>
-              {getEstadoIcon()}
+              <div className="min-w-0 flex-1">
+                <h3 className="text-xs md:text-base font-bold text-textPrimary group-hover:text-white transition-colors truncate">
+                  {torneo.nombre}
+                </h3>
+                {/* Estado label pequeño */}
+                <div className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[8px] md:text-[10px] font-bold mt-0.5 ${
+                  torneo.estado === 'activo' 
+                    ? 'bg-secondary/10 text-secondary' 
+                    : torneo.estado === 'finalizado'
+                    ? 'bg-accent/10 text-accent'
+                    : 'bg-primary/10 text-primary'
+                }`}>
+                  {getEstadoIcon()}
+                  <span>{getEstadoLabel()}</span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -141,10 +162,7 @@ const TorneoCard = forwardRef<HTMLDivElement, TorneoCardProps>(({ torneo }, ref)
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between pt-1.5 md:pt-3 border-t border-cardBorder mt-auto">
-            <div className="text-textSecondary text-[9px] md:text-sm">
-              {torneo.salasIds?.length || 0} {(torneo.salasIds?.length || 0) === 1 ? 'partido' : 'partidos'}
-            </div>
+          <div className="flex items-center justify-end pt-1.5 md:pt-3 border-t border-cardBorder mt-auto">
             <Button
               variant="primary"
               size="sm"
