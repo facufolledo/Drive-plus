@@ -147,23 +147,44 @@ export default function ModalCrearTorneo({ isOpen, onClose }: ModalCrearTorneoPr
         horarios_disponibles: (() => {
           // Convertir formato {semana: [{desde, hasta}], finDeSemana: [{desde, hasta}]}
           // a formato por día: {lunes: {inicio, fin}, martes: {inicio, fin}, ...}
+          // SOLO para los días que están dentro del rango fechaInicio - fechaFin
           const resultado: Record<string, {inicio: string, fin: string}> = {};
-          const diasSemana = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes'];
-          const diasFinDeSemana = ['sabado', 'domingo'];
+          
+          // Calcular qué días de la semana están en el rango del torneo
+          const inicio = new Date(formData.fechaInicio);
+          const fin = new Date(formData.fechaFin);
+          const diasEnRango = new Set<string>();
+          
+          // Mapeo de día de semana (0=domingo, 1=lunes, ..., 6=sábado) a nombre
+          const nombresDias = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+          
+          // Iterar por cada día del rango
+          for (let d = new Date(inicio); d <= fin; d.setDate(d.getDate() + 1)) {
+            const diaSemana = d.getDay(); // 0=domingo, 1=lunes, ..., 6=sábado
+            diasEnRango.add(nombresDias[diaSemana]);
+          }
           
           // Tomar el primer horario de semana (el principal)
           const horarioSemana = horariosDisponibles.semana.find(h => h.desde && h.hasta);
           if (horarioSemana) {
+            const diasSemana = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes'];
             diasSemana.forEach(dia => {
-              resultado[dia] = { inicio: horarioSemana.desde, fin: horarioSemana.hasta };
+              // Solo agregar si el día está en el rango del torneo
+              if (diasEnRango.has(dia)) {
+                resultado[dia] = { inicio: horarioSemana.desde, fin: horarioSemana.hasta };
+              }
             });
           }
           
           // Tomar el primer horario de fin de semana
           const horarioFinde = horariosDisponibles.finDeSemana.find(h => h.desde && h.hasta);
           if (horarioFinde) {
+            const diasFinDeSemana = ['sabado', 'domingo'];
             diasFinDeSemana.forEach(dia => {
-              resultado[dia] = { inicio: horarioFinde.desde, fin: horarioFinde.hasta };
+              // Solo agregar si el día está en el rango del torneo
+              if (diasEnRango.has(dia)) {
+                resultado[dia] = { inicio: horarioFinde.desde, fin: horarioFinde.hasta };
+              }
             });
           }
           

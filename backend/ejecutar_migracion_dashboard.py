@@ -23,6 +23,12 @@ if not DATABASE_URL:
     print("Por favor, ejecuta: export DATABASE_URL='tu_url_de_postgres'")
     exit(1)
 
+# Convertir formato SQLAlchemy a formato psycopg2
+if DATABASE_URL.startswith('postgresql+pg8000://'):
+    DATABASE_URL = DATABASE_URL.replace('postgresql+pg8000://', 'postgresql://')
+elif DATABASE_URL.startswith('postgresql+psycopg2://'):
+    DATABASE_URL = DATABASE_URL.replace('postgresql+psycopg2://', 'postgresql://')
+
 print(f"🔗 Conectando a la base de datos...")
 
 try:

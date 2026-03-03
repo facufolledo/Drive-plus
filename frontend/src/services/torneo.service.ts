@@ -466,18 +466,6 @@ class TorneoService {
     return response.data;
   }
 
-  async eliminarFixture(torneoId: number, categoriaId?: number): Promise<any> {
-    const config = this.getAuthHeaders();
-    if (categoriaId !== undefined && categoriaId !== null) {
-      config.params = { categoria_id: categoriaId };
-    }
-    const response = await axios.delete(
-      `${API_URL}/torneos/${torneoId}/fixture`,
-      config
-    );
-    return response.data;
-  }
-
   async listarPartidos(torneoId: number, params?: { zona_id?: number; fase?: string }): Promise<any[]> {
     const response = await axios.get(`${API_URL}/torneos/${torneoId}/partidos`, { params });
     return response.data;
