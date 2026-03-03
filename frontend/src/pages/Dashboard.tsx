@@ -14,7 +14,6 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useSalas } from '../context/SalasContext';
 import { dashboardService } from '../services/dashboard.service';
-import type { PartidoHistorial } from '../services/perfil.service';
 
 // --- Helpers de categoría y progreso (mismo criterio que MiPerfil) ---
 const UMBRALES = [
@@ -51,12 +50,13 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { salas, cargarSalas } = useSalas();
 
-  const [loading, setLoading] = useState(false); // Cambiado a false para mostrar inmediatamente
   const [topMasculino, setTopMasculino] = useState<any[]>([]);
   const [topFemenino, setTopFemenino] = useState<any[]>([]);
-  const [partidos, setPartidos] = useState<any[]>([]);
+  const [partidos, setPartidos] = useState<any[]>([]); // Últimos 3 partidos del backend (para mostrar)
+  const [partidosCompletos, setPartidosCompletos] = useState<any[]>([]); // Todos los partidos (para winrate)
+  const [totalPartidos, setTotalPartidos] = useState<number>(0);
   const [deltaEstaSemana, setDeltaEstaSemana] = useState(0);
-  const [loadingRanking, setLoadingRanking] = useState(false); // Cambiado a false para mostrar cache inmediatamente
+  const [loadingRanking, setLoadingRanking] = useState(false);
 
   // Cargar datos del cache al inicio
   useEffect(() => {
@@ -65,15 +65,19 @@ export default function Dashboard() {
       try {
         const data = JSON.parse(cached);
         const cacheAge = Date.now() - (data.timestamp || 0);
-        // Si el cache tiene menos de 5 minutos, usarlo
-        if (cacheAge < 5 * 60 * 1000) {
+        // Si el cache tiene menos de 2 minutos, usarlo
+        if (cacheAge < 2 * 60 * 1000) {
           setTopMasculino(data.top_masculino || []);
           setTopFemenino(data.top_femenino || []);
           setPartidos(data.ultimos_partidos || []);
+          setTotalPartidos(data.total_partidos || 0);
           setDeltaEstaSemana(data.delta_semanal || 0);
+        } else {
+          localStorage.removeItem('dashboard_cache');
         }
       } catch (e) {
         console.error('Error cargando cache:', e);
+        localStorage.removeItem('dashboard_cache');
       }
     }
   }, []);
@@ -81,7 +85,7 @@ export default function Dashboard() {
   const rating = usuario?.rating ?? 1200;
   const nombreCompleto = [usuario?.nombre, usuario?.apellido].filter(Boolean).join(' ') || usuario?.email?.split('@')[0] || 'Jugador';
   const ciudad = (usuario as any)?.ciudad;
-  const esFemenino = usuario?.sexo === 'femenino' || usuario?.sexo === 'F';
+  const esFemenino = usuario?.sexo === 'F';
 
   const { nombre: categoriaNombre, siguienteUmbral, ptsParaSubir, progresoPct } = getCategoriaDesdeRating(rating);
   const siguienteCategoria = useMemo(() => {
@@ -115,17 +119,32 @@ export default function Dashboard() {
     return { masculino: topMasculino, femenino: topFemenino };
   }, [topMasculino, topFemenino]);
 
-  // Misma lógica que Mi Perfil: victorias, winrate desde partidos
-  const esVictoria = (p: any): boolean => {
-    return p.victoria === true;
-  };
-
-  const { totalPartidos, winrate } = useMemo(() => {
-    const total = partidos.length;
-    const wins = partidos.filter(esVictoria).length;
-    const wr = total > 0 ? Math.round((wins / total) * 100) : 0;
-    return { totalPartidos: total, winrate: wr };
-  }, [partidos]);
+  // Calcular winrate con TODOS los partidos (no solo los últimos 3)
+  const winrate = useMemo(() => {
+    // Si tenemos partidosCompletos, usarlos (más preciso)
+    if (partidosCompletos.length > 0) {
+      const wins = partidosCompletos.filter((p: any) => {
+        // Determinar victoria por delta de historial_rating
+        if (p.historial_rating?.delta) {
+          return p.historial_rating.delta > 0;
+        }
+        // Fallback: determinar por resultado
+        if (p.resultado) {
+          const miEquipo = p.jugadores?.find((j: any) => j.id_usuario === usuario?.id_usuario)?.equipo;
+          if (miEquipo === 1) return p.resultado.sets_eq1 > p.resultado.sets_eq2;
+          else return p.resultado.sets_eq2 > p.resultado.sets_eq1;
+        }
+        return false;
+      }).length;
+      return Math.round((wins / partidosCompletos.length) * 100);
+    }
+    // Fallback: usar solo los últimos 3 si aún no cargaron todos
+    if (partidos.length > 0) {
+      const wins = partidos.filter((p: any) => p.victoria === true).length;
+      return Math.round((wins / partidos.length) * 100);
+    }
+    return 0;
+  }, [partidosCompletos, partidos, usuario?.id_usuario]);
 
   useEffect(() => {
     if (!usuario?.id_usuario) return;
@@ -135,7 +154,7 @@ export default function Dashboard() {
     const hasCache = topMasculino.length > 0 || topFemenino.length > 0;
     if (!hasCache) setLoadingRanking(true);
     
-    // Cargar datos optimizados en una sola llamada
+    // Cargar datos del dashboard (rápido)
     (async () => {
       try {
         const data = await dashboardService.getDashboardData();
@@ -145,6 +164,7 @@ export default function Dashboard() {
           top_masculino: data.top_masculino || [],
           top_femenino: data.top_femenino || [],
           ultimos_partidos: data.ultimos_partidos || [],
+          total_partidos: data.total_partidos || 0,
           delta_semanal: data.delta_semanal || 0,
           timestamp: Date.now()
         };
@@ -152,79 +172,34 @@ export default function Dashboard() {
         setTopMasculino(newData.top_masculino);
         setTopFemenino(newData.top_femenino);
         setPartidos(newData.ultimos_partidos);
+        setTotalPartidos(newData.total_partidos);
         setDeltaEstaSemana(newData.delta_semanal);
         
         // Guardar en cache
         localStorage.setItem('dashboard_cache', JSON.stringify(newData));
-      } catch (e) {
-        console.error('Error cargando dashboard optimizado, usando fallback:', e);
-        // Fallback: usar método anterior si el nuevo endpoint falla
-        if (!cancelled) {
+        
+        // Cargar TODOS los partidos en SEGUNDO PLANO (no bloquea la UI)
+        // Esto es necesario para calcular el winrate correctamente
+        (async () => {
           try {
-            const { apiService } = await import('../services/api');
             const { perfilService } = await import('../services/perfil.service');
-            
-            // Pedir rankings separados por sexo (más rápido)
-            const [rankingMasculino, rankingFemenino, partidosRes] = await Promise.all([
-              apiService.getRankingGeneral(5, 0, 'masculino'),
-              apiService.getRankingGeneral(5, 0, 'femenino'),
-              perfilService.getHistorial(usuario.id_usuario, 5).catch(() => []),
-            ]);
-            
-            if (cancelled) return;
-            
-            const masculinos = Array.isArray(rankingMasculino) ? rankingMasculino.slice(0, 5) : [];
-            const femeninos = Array.isArray(rankingFemenino) ? rankingFemenino.slice(0, 5) : [];
-            
-            console.log('Fallback - Masculino:', masculinos.length, masculinos);
-            console.log('Fallback - Femenino:', femeninos.length, femeninos);
-            
-            setTopMasculino(masculinos);
-            setTopFemenino(femeninos);
-            
-            // Convertir partidos al formato esperado
-            const partidosFormateados = (Array.isArray(partidosRes) ? partidosRes : []).slice(0, 3).map((p: any) => {
-              const esVictoria = p.historial_rating?.delta > 0 || 
-                (p.resultado && p.jugadores?.find((j: any) => j.id_usuario === usuario.id_usuario)?.equipo === 1 
-                  ? p.resultado.sets_eq1 > p.resultado.sets_eq2 
-                  : p.resultado?.sets_eq2 > p.resultado?.sets_eq1);
-              
-              return {
-                id_partido: p.id_partido,
-                fecha: p.fecha,
-                victoria: esVictoria,
-                delta: p.historial_rating?.delta || 0
-              };
-            });
-            
-            setPartidos(partidosFormateados);
-            
-            // Calcular delta semanal
-            const hace7Dias = Date.now() - 7 * 24 * 60 * 60 * 1000;
-            const deltaSemana = (Array.isArray(partidosRes) ? partidosRes : [])
-              .filter((p: any) => new Date(p.fecha).getTime() >= hace7Dias && p.historial_rating)
-              .reduce((acc: number, p: any) => acc + (p.historial_rating?.delta ?? 0), 0);
-            
-            setDeltaEstaSemana(deltaSemana);
-            
-            // Guardar en cache
-            const cacheData = {
-              top_masculino: masculinos,
-              top_femenino: femeninos,
-              ultimos_partidos: partidosFormateados,
-              delta_semanal: deltaSemana,
-              timestamp: Date.now()
-            };
-            localStorage.setItem('dashboard_cache', JSON.stringify(cacheData));
-          } catch (fallbackError) {
-            console.error('Error en fallback:', fallbackError);
-            if (!hasCache) {
-              setTopMasculino([]);
-              setTopFemenino([]);
-              setPartidos([]);
-              setDeltaEstaSemana(0);
+            const todosLosPartidos = await perfilService.getHistorial(usuario.id_usuario, 100);
+            if (!cancelled && Array.isArray(todosLosPartidos)) {
+              setPartidosCompletos(todosLosPartidos);
             }
+          } catch (err) {
+            console.error('Error cargando historial completo:', err);
+            // No es crítico, el winrate se calculará con los últimos 3
           }
+        })();
+      } catch (e) {
+        console.error('Error cargando dashboard optimizado:', e);
+        if (!cancelled && !hasCache) {
+          setTopMasculino([]);
+          setTopFemenino([]);
+          setPartidos([]);
+          setTotalPartidos(0);
+          setDeltaEstaSemana(0);
         }
       } finally {
         if (!cancelled) setLoadingRanking(false);
@@ -264,45 +239,74 @@ export default function Dashboard() {
 
   return (
     <div className="w-full min-w-0 space-y-5 pb-6">
-      {/* Hero Card - Grande y colorido */}
+      {/* Hero Card - Rediseñado con mejor jerarquía */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2">
           <Card gradient className="overflow-hidden border-2 border-primary/30 shadow-2xl shadow-primary/20 bg-gradient-to-br from-primary/20 via-cardBg to-secondary/10 h-full">
-            <div className="relative p-6 md:p-8 h-full flex flex-col justify-between">
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-transparent to-secondary/10" />
-              <div className="absolute top-0 right-0 w-64 h-64 bg-primary/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-              <div className="relative z-10 flex-1 flex items-center justify-between gap-6 md:gap-12">
+            <div className="relative p-6 md:p-8 h-full flex flex-col">
+              {/* Fondo con opacidad reducida */}
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/15 via-transparent to-secondary/8 opacity-85" />
+              <div className="absolute top-0 right-0 w-64 h-64 bg-primary/15 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 opacity-85" />
+              
+              <div className="relative z-10 flex-1 flex flex-col items-center justify-center text-center gap-4">
                 {!usuario ? (
                   <div className="flex justify-center py-8 w-full">
                     <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin" />
                   </div>
                 ) : (
                   <>
-                    {/* Columna izquierda: Info del usuario */}
-                    <div className="flex-1 flex flex-col justify-center">
+                    {/* Ranking General arriba */}
+                    {posicionRanking && ciudad && (
                       <div className="mb-2">
-                        <p className="text-base md:text-lg text-textSecondary font-medium mb-1">{esFemenino ? 'Bienvenida,' : 'Bienvenido,'}</p>
-                        <div className="flex items-center gap-3 mb-2">
-                          <h1 className="text-2xl md:text-3xl font-black text-textPrimary">{nombreCompleto}</h1>
-                          <span className="px-3 py-1.5 rounded-lg text-xs font-black uppercase bg-gradient-to-r from-primary to-primary/80 text-white border-2 border-primary/60 shadow-lg flex-shrink-0">
-                            {categoriaNombre}
-                          </span>
+                        <div className="inline-flex items-center gap-3 px-5 py-2.5 rounded-xl bg-gradient-to-r from-accent/20 to-yellow-500/20 border-2 border-accent/40 shadow-lg">
+                          <Trophy className="w-5 h-5 text-accent" />
+                          <div className="text-left">
+                            <p className="text-xs text-textSecondary font-bold uppercase tracking-wider">Tu Ranking General</p>
+                            <p className="text-lg font-black text-accent">#{posicionRanking} en {ciudad}</p>
+                          </div>
                         </div>
                       </div>
-                      {posicionRanking && ciudad && (
-                        <p className="text-sm font-bold text-accent mb-4">#{posicionRanking} en {ciudad}</p>
-                      )}
-                    
-                    {/* Últimos 3 partidos */}
-                    {partidos.length > 0 && (
-                      <div className="flex items-center gap-3 mb-4">
-                        <span className="text-xs text-textSecondary font-semibold">Últimos 3 partidos:</span>
+                    )}
+
+                    {/* Saludo y nombre */}
+                    <div className="mb-2">
+                      <p className="text-sm md:text-base text-textSecondary/80 font-medium mb-1">{esFemenino ? 'Bienvenida,' : 'Bienvenido,'}</p>
+                      <div className="flex items-center justify-center gap-3 mb-3">
+                        <h1 className="text-2xl md:text-3xl font-black text-textPrimary">{nombreCompleto}</h1>
+                        <span className="px-3 py-1.5 rounded-lg text-xs font-black uppercase bg-gradient-to-r from-primary to-primary/80 text-white border-2 border-primary/60 shadow-lg">
+                          {categoriaNombre}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Rating PROTAGONISTA - Responsive */}
+                    <div className="my-3 md:my-4">
+                      <div className="flex flex-col items-center">
+                        <span className="block text-[60px] md:text-[100px] leading-none font-black text-primary tabular-nums" style={{ textShadow: '0 0 40px rgba(0,85,255,0.6)' }}>{rating}</span>
+                        <span className="block text-base md:text-2xl text-textSecondary font-black -mt-2 md:-mt-3 uppercase tracking-widest">PUNTOS</span>
+                      </div>
+                    </div>
+
+                    {/* Últimos 3 partidos - Responsive */}
+                    {totalPartidos > 0 && (partidosCompletos.length > 0 || partidos.length > 0) && (
+                      <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3 mb-3">
+                        <span className="text-xs text-textSecondary/70 font-semibold">Últimos 3 partidos:</span>
                         <div className="flex gap-2">
-                          {partidos.slice(0, 3).map((partido, idx) => {
-                            const victoria = esVictoria(partido);
+                          {(partidosCompletos.length > 0 ? partidosCompletos : partidos).slice(0, 3).map((partido, idx) => {
+                            // Determinar victoria desde partidosCompletos (más completo)
+                            let victoria = false;
+                            if (partido.victoria !== undefined) {
+                              victoria = partido.victoria === true;
+                            } else if (partido.historial_rating?.delta) {
+                              victoria = partido.historial_rating.delta > 0;
+                            } else if (partido.resultado) {
+                              const miEquipo = partido.jugadores?.find((j: any) => j.id_usuario === usuario?.id_usuario)?.equipo;
+                              if (miEquipo === 1) victoria = partido.resultado.sets_eq1 > partido.resultado.sets_eq2;
+                              else victoria = partido.resultado.sets_eq2 > partido.resultado.sets_eq1;
+                            }
                             return (
-                              <div key={idx} className={`w-7 h-7 rounded-full flex items-center justify-center shadow-lg ${victoria ? 'bg-green-500' : 'bg-red-500'}`}>
-                                <span className="text-white text-sm font-black">{victoria ? '✓' : '✗'}</span>
+                              <div key={idx} className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center shadow-lg ${victoria ? 'bg-green-500' : 'bg-red-500'}`}>
+                                <span className="text-white text-xs sm:text-sm font-black">{victoria ? '✓' : '✗'}</span>
                               </div>
                             );
                           })}
@@ -312,38 +316,35 @@ export default function Dashboard() {
 
                     {/* Variación de rating */}
                     {deltaEstaSemana !== 0 && (
-                      <div className={`flex items-center gap-2 mb-4 px-3 py-1.5 rounded-lg border-2 inline-flex ${deltaEstaSemana > 0 ? 'bg-green-500/20 border-green-500/40 text-green-400' : 'bg-red-500/20 border-red-500/40 text-red-400'}`}>
+                      <div className={`flex items-center gap-2 mb-3 px-4 py-2 rounded-lg border-2 ${deltaEstaSemana > 0 ? 'bg-green-500/20 border-green-500/40 text-green-400' : 'bg-red-500/20 border-red-500/40 text-red-400'}`}>
                         <TendenciaIcon className="w-4 h-4" />
                         <span className="text-sm font-black">{deltaEstaSemana > 0 ? '+' : ''}{deltaEstaSemana} pts esta semana</span>
                       </div>
                     )}
                     
-                      {siguienteCategoria && siguienteUmbral && (
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm font-bold">
-                            <span className="text-textPrimary">Estás a {ptsParaSubir} pts de {siguienteCategoria}</span>
-                            <span className="text-accent">{Math.round(progresoPct)}%</span>
-                          </div>
-                          <div className="h-3 bg-cardBorder/50 rounded-full overflow-hidden shadow-inner">
-                            <div className="h-full bg-gradient-to-r from-primary via-blue-400 to-accent rounded-full transition-all duration-500 shadow-lg" style={{ width: `${progresoPct}%` }} />
-                          </div>
-                          {/* Mensaje motivacional mejorado */}
-                          {ptsParaSubir <= 100 && (
-                            <p className="text-xs text-accent font-bold">
-                              💪 Ganando {Math.ceil(ptsParaSubir / 25)} partidos podrías ascender
-                            </p>
-                          )}
+                    {/* Barra de progreso mejorada - Responsive */}
+                    {siguienteCategoria && siguienteUmbral && (
+                      <div className="w-full max-w-md space-y-2">
+                        <div className="flex flex-col sm:flex-row sm:justify-between gap-1 text-xs sm:text-sm font-bold">
+                          <span className="text-textPrimary text-center sm:text-left">🔥 A {ptsParaSubir} pts de ascender a {siguienteCategoria}</span>
+                          <span className="text-accent text-center sm:text-right">{Math.round(progresoPct)}%</span>
                         </div>
-                      )}
-                    </div>
-
-                    {/* Columna derecha: Rating gigante */}
-                    <div className="flex flex-col items-end justify-center">
-                      <div className="text-right">
-                        <span className="block text-[50px] md:text-[80px] leading-none font-black text-primary tabular-nums drop-shadow-[0_0_35px_rgba(0,85,255,0.7)]">{rating}</span>
-                        <span className="block text-sm md:text-lg text-textSecondary font-bold -mt-1 md:-mt-2">pts</span>
+                        <div className="h-3 sm:h-4 bg-cardBorder/50 rounded-full overflow-hidden shadow-inner">
+                          <div 
+                            className="h-full bg-gradient-to-r from-primary via-blue-400 to-accent rounded-full transition-all duration-700 shadow-lg" 
+                            style={{ 
+                              width: `${progresoPct}%`,
+                              boxShadow: '0 0 20px rgba(0,85,255,0.5)'
+                            }} 
+                          />
+                        </div>
+                        {ptsParaSubir <= 100 && (
+                          <p className="text-[10px] sm:text-xs text-accent font-bold text-center">
+                            💪 Ganando {Math.ceil(ptsParaSubir / 25)} partidos podrías ascender
+                          </p>
+                        )}
                       </div>
-                    </div>
+                    )}
                   </>
                 )}
               </div>
@@ -391,8 +392,8 @@ export default function Dashboard() {
               ) : (
                 <div className="rounded-xl bg-gradient-to-br from-primary/30 to-secondary/30 border-2 border-primary/50 p-5 text-center shadow-xl">
                   <p className="text-textPrimary text-base font-black mb-4">Creá una sala y sumá puntos</p>
-                  <button onClick={() => navigate('/salas')} className="w-full px-8 py-4 rounded-xl font-black text-lg bg-gradient-to-r from-primary via-blue-600 to-primary text-white hover:scale-105 transition-all shadow-2xl shadow-primary/50 border-2 border-primary/30">
-                    <Target className="w-6 h-6 inline mr-2" />
+                  <button onClick={() => navigate('/salas')} className="w-full px-8 py-4 rounded-xl font-black text-base bg-gradient-to-r from-primary via-blue-600 to-primary text-white hover:scale-105 transition-all shadow-2xl shadow-primary/50 border-2 border-primary/30 flex items-center justify-center gap-2">
+                    <Target className="w-5 h-5" />
                     Crear sala
                   </button>
                 </div>
@@ -443,29 +444,43 @@ export default function Dashboard() {
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <p className="text-xs font-black text-textSecondary uppercase mb-2">Masculino</p>
                   <div className="space-y-2">
-                    {topJugadores.masculino.map((jugador: any, index: number) => (
-                      <div key={jugador.id_usuario} onClick={() => jugador.nombre_usuario && navigate(`/perfil/${jugador.nombre_usuario}`)} className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all hover:scale-[1.02] border-2 ${index === 0 ? 'bg-gradient-to-r from-amber-500/20 to-amber-500/10 border-amber-500/40 shadow-lg' : 'bg-cardHover border-transparent hover:border-primary/30'}`}>
-                        <span className={`text-xs font-black w-5 text-center ${index === 0 ? 'text-amber-400' : 'text-textSecondary'}`}>#{index + 1}</span>
-                        <p className="text-sm font-bold text-textPrimary truncate flex-1">{jugador.nombre} {jugador.apellido}</p>
-                        <span className="text-sm font-black text-primary">{jugador.rating}</span>
-                      </div>
-                    ))}
+                    {topJugadores.masculino.map((jugador: any, index: number) => {
+                      const medalla = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : null;
+                      return (
+                        <div key={jugador.id_usuario} onClick={() => jugador.nombre_usuario && navigate(`/perfil/${jugador.nombre_usuario}`)} className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all hover:scale-[1.02] border-2 bg-cardHover ${index === 0 ? 'bg-gradient-to-r from-amber-500/20 to-amber-500/10 border-amber-500/40 shadow-lg' : 'border-cardBorder/50 hover:border-primary/30'}`}>
+                          {medalla ? (
+                            <span className="text-sm sm:text-base">{medalla}</span>
+                          ) : (
+                            <span className="text-[10px] sm:text-xs font-black w-4 sm:w-5 text-center text-textSecondary">#{index + 1}</span>
+                          )}
+                          <p className="text-xs sm:text-sm font-bold text-textPrimary truncate flex-1">{jugador.nombre} {jugador.apellido}</p>
+                          <span className="text-xs sm:text-sm font-black text-primary">{jugador.rating}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
                 <div>
                   <p className="text-xs font-black text-textSecondary uppercase mb-2">Femenino</p>
                   <div className="space-y-2">
-                    {topJugadores.femenino.map((jugador: any, index: number) => (
-                      <div key={jugador.id_usuario} onClick={() => jugador.nombre_usuario && navigate(`/perfil/${jugador.nombre_usuario}`)} className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all hover:scale-[1.02] border-2 ${index === 0 ? 'bg-gradient-to-r from-amber-500/20 to-amber-500/10 border-amber-500/40 shadow-lg' : 'bg-cardBorder/50 border-transparent hover:border-secondary/30'}`}>
-                        <span className={`text-xs font-black w-5 text-center ${index === 0 ? 'text-amber-400' : 'text-textSecondary'}`}>#{index + 1}</span>
-                        <p className="text-sm font-bold text-textPrimary truncate flex-1">{jugador.nombre} {jugador.apellido}</p>
-                        <span className="text-sm font-black text-secondary">{jugador.rating}</span>
-                      </div>
-                    ))}
+                    {topJugadores.femenino.map((jugador: any, index: number) => {
+                      const medalla = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : null;
+                      return (
+                        <div key={jugador.id_usuario} onClick={() => jugador.nombre_usuario && navigate(`/perfil/${jugador.nombre_usuario}`)} className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all hover:scale-[1.02] border-2 bg-cardHover ${index === 0 ? 'bg-gradient-to-r from-amber-500/20 to-amber-500/10 border-amber-500/40 shadow-lg' : 'border-cardBorder/50 hover:border-primary/30'}`}>
+                          {medalla ? (
+                            <span className="text-sm sm:text-base">{medalla}</span>
+                          ) : (
+                            <span className="text-[10px] sm:text-xs font-black w-4 sm:w-5 text-center text-textSecondary">#{index + 1}</span>
+                          )}
+                          <p className="text-xs sm:text-sm font-bold text-textPrimary truncate flex-1">{jugador.nombre} {jugador.apellido}</p>
+                          <span className="text-xs sm:text-sm font-black text-secondary">{jugador.rating}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>

@@ -175,12 +175,12 @@ export default function TorneoCategorias({ torneoId, esOrganizador, onCategoriaS
             </div>
           </div>
 
-          {/* Lista de categorías */}
+          {/* Lista de categorías - REDISEÑADO como cards compactas */}
           {expandido && (
             <motion.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
-              className="mt-4 space-y-2"
+              className="mt-4"
             >
               {categorias.length === 0 ? (
                 <div className="text-center py-6 text-textSecondary">
@@ -196,7 +196,7 @@ export default function TorneoCategorias({ torneoId, esOrganizador, onCategoriaS
                   {/* Filtro "Todas" */}
                   <button
                     onClick={() => seleccionarCategoria(null)}
-                    className={`w-full p-3 rounded-lg border text-left transition-all ${
+                    className={`w-full mb-3 p-3 rounded-lg border text-left transition-all ${
                       categoriaSeleccionada === null
                         ? 'border-primary bg-primary/10'
                         : 'border-cardBorder hover:border-primary/50'
@@ -205,58 +205,72 @@ export default function TorneoCategorias({ torneoId, esOrganizador, onCategoriaS
                     <span className="font-bold text-textPrimary">Todas las categorías</span>
                   </button>
 
-                  {/* Categorías */}
-                  {categorias.map((cat) => (
-                    <div
-                      key={cat.id}
-                      className={`p-3 rounded-lg border transition-all ${
-                        categoriaSeleccionada === cat.id
-                          ? 'border-primary bg-primary/10'
-                          : 'border-cardBorder hover:border-primary/50'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <button
+                  {/* Grid de categorías como cards compactas */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {categorias.map((cat) => {
+                      const colorClasses = cat.genero === 'masculino' 
+                        ? 'from-blue-500/20 to-blue-600/10 border-blue-500/40 hover:border-blue-500/70'
+                        : cat.genero === 'femenino'
+                        ? 'from-pink-500/20 to-pink-600/10 border-pink-500/40 hover:border-pink-500/70'
+                        : 'from-purple-500/20 to-purple-600/10 border-purple-500/40 hover:border-purple-500/70';
+                      
+                      const textColor = cat.genero === 'masculino'
+                        ? 'text-blue-400'
+                        : cat.genero === 'femenino'
+                        ? 'text-pink-400'
+                        : 'text-purple-400';
+                      
+                      return (
+                        <motion.div
+                          key={cat.id}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          className={`relative p-4 rounded-xl border-2 bg-gradient-to-br transition-all cursor-pointer ${colorClasses} ${
+                            categoriaSeleccionada === cat.id
+                              ? 'ring-2 ring-primary shadow-lg'
+                              : ''
+                          }`}
                           onClick={() => seleccionarCategoria(cat.id)}
-                          className="flex-1 text-left"
                         >
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-textPrimary">{cat.nombre}</span>
-                            <span className={`text-xs px-2 py-0.5 rounded-full ${
-                              cat.genero === 'masculino' ? 'bg-blue-500/20 text-blue-400' :
-                              cat.genero === 'femenino' ? 'bg-pink-500/20 text-pink-400' :
-                              'bg-purple-500/20 text-purple-400'
-                            }`}>
+                          {/* Nombre y género */}
+                          <div className="mb-3">
+                            <h4 className={`text-xl font-black ${textColor} mb-1`}>
+                              {cat.nombre}
+                            </h4>
+                            <span className="text-xs uppercase tracking-wider text-textSecondary font-bold">
                               {cat.genero}
                             </span>
                           </div>
-                          <div className="flex items-center gap-3 mt-1 text-xs text-textSecondary">
-                            <span className="flex items-center gap-1">
-                              <Users size={12} />
-                              {cat.parejas_inscritas} parejas
+                          
+                          {/* Número de parejas */}
+                          <div className="flex items-center gap-2">
+                            <Users size={16} className={textColor} />
+                            <span className="text-sm font-bold text-textPrimary">
+                              {cat.parejas_inscritas} {cat.parejas_inscritas === 1 ? 'pareja' : 'parejas'}
                             </span>
                           </div>
-                        </button>
-                        
-                        {esOrganizador && (
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => abrirModalEditar(cat)}
-                              className="p-1.5 text-textSecondary hover:text-primary transition-colors"
-                            >
-                              <Edit2 size={14} />
-                            </button>
-                            <button
-                              onClick={() => eliminarCategoria(cat)}
-                              className="p-1.5 text-textSecondary hover:text-red-500 transition-colors"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                          
+                          {/* Botones de acción (solo organizador) */}
+                          {esOrganizador && (
+                            <div className="absolute top-2 right-2 flex items-center gap-1">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); abrirModalEditar(cat); }}
+                                className="p-1.5 bg-cardBg/80 backdrop-blur-sm rounded-lg text-textSecondary hover:text-primary transition-colors"
+                              >
+                                <Edit2 size={14} />
+                              </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); eliminarCategoria(cat); }}
+                                className="p-1.5 bg-cardBg/80 backdrop-blur-sm rounded-lg text-textSecondary hover:text-red-500 transition-colors"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          )}
+                        </motion.div>
+                      );
+                    })}
+                  </div>
                 </>
               )}
             </motion.div>

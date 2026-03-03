@@ -87,9 +87,17 @@ export default function InvitacionesPendientes() {
 
   if (invitaciones.length === 0) {
     return (
-      <div className="text-center py-6 text-textSecondary">
-        <Trophy size={32} className="mx-auto mb-2 opacity-50" />
-        <p className="text-sm">No tienes invitaciones pendientes</p>
+      <div className="text-center py-6">
+        <div className="mb-3 opacity-50">
+          <Trophy size={32} className="mx-auto text-textSecondary" />
+        </div>
+        <p className="text-sm text-textSecondary mb-3">📭 Sin invitaciones</p>
+        <button 
+          onClick={() => navigate('/torneos')}
+          className="px-4 py-2 rounded-lg bg-accent/20 hover:bg-accent/30 text-accent text-sm font-bold transition-all hover:scale-105 border border-accent/30"
+        >
+          Explorá torneos disponibles →
+        </button>
       </div>
     );
   }

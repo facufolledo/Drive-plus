@@ -2018,6 +2018,110 @@ def eliminar_fixture(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{torneo_id}/verificar-solapamientos")
+def verificar_solapamientos(
+    torneo_id: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user)
+):
+    """
+    Verifica si hay solapamientos de horarios en los partidos programados del torneo.
+    
+    Retorna:
+    - solapamientos: Lista de partidos que se solapan
+    - total_solapamientos: Número total de solapamientos detectados
+    
+    Solo organizadores pueden verificar solapamientos.
+    """
+    from ..models.torneo_models import Torneo
+    from ..models.driveplus_models import Partido
+    from datetime import timedelta
+    
+    try:
+        # Verificar permisos
+        torneo = db.query(Torneo).filter(Torneo.id == torneo_id).first()
+        if not torneo:
+            raise HTTPException(status_code=404, detail="Torneo no encontrado")
+        
+        if torneo.creado_por != current_user.id_usuario:
+            raise HTTPException(status_code=403, detail="No tienes permisos")
+        
+        # Obtener todos los partidos programados del torneo
+        partidos = db.query(Partido).filter(
+            Partido.id_torneo == torneo_id,
+            Partido.fecha_hora.isnot(None)
+        ).order_by(Partido.fecha_hora).all()
+        
+        solapamientos = []
+        duracion_partido = timedelta(minutes=50)
+        
+        # Verificar solapamientos
+        for i, partido1 in enumerate(partidos):
+            fin_partido1 = partido1.fecha_hora + duracion_partido
+            
+            for partido2 in partidos[i+1:]:
+                inicio_partido2 = partido2.fecha_hora
+                fin_partido2 = inicio_partido2 + duracion_partido
+                
+                # Verificar si se solapan
+                if partido1.fecha_hora < fin_partido2 and inicio_partido2 < fin_partido1:
+                    # Verificar si comparten cancha
+                    if partido1.cancha_id and partido2.cancha_id and partido1.cancha_id == partido2.cancha_id:
+                        solapamientos.append({
+                            "tipo": "cancha",
+                            "partido1": {
+                                "id": partido1.id_partido,
+                                "fecha_hora": partido1.fecha_hora.isoformat(),
+                                "cancha_id": partido1.cancha_id,
+                                "pareja1": partido1.pareja1_id,
+                                "pareja2": partido1.pareja2_id
+                            },
+                            "partido2": {
+                                "id": partido2.id_partido,
+                                "fecha_hora": partido2.fecha_hora.isoformat(),
+                                "cancha_id": partido2.cancha_id,
+                                "pareja1": partido2.pareja1_id,
+                                "pareja2": partido2.pareja2_id
+                            },
+                            "mensaje": f"Misma cancha ({partido1.cancha_id}) en horarios solapados"
+                        })
+                    
+                    # Verificar si comparten parejas
+                    parejas1 = {partido1.pareja1_id, partido1.pareja2_id}
+                    parejas2 = {partido2.pareja1_id, partido2.pareja2_id}
+                    parejas_comunes = parejas1 & parejas2
+                    
+                    if parejas_comunes:
+                        solapamientos.append({
+                            "tipo": "pareja",
+                            "partido1": {
+                                "id": partido1.id_partido,
+                                "fecha_hora": partido1.fecha_hora.isoformat(),
+                                "cancha_id": partido1.cancha_id,
+                                "pareja1": partido1.pareja1_id,
+                                "pareja2": partido1.pareja2_id
+                            },
+                            "partido2": {
+                                "id": partido2.id_partido,
+                                "fecha_hora": partido2.fecha_hora.isoformat(),
+                                "cancha_id": partido2.cancha_id,
+                                "pareja1": partido2.pareja1_id,
+                                "pareja2": partido2.pareja2_id
+                            },
+                            "parejas_comunes": list(parejas_comunes),
+                            "mensaje": f"Pareja(s) {list(parejas_comunes)} juegan en horarios solapados"
+                        })
+        
+        return {
+            "total_solapamientos": len(solapamientos),
+            "solapamientos": solapamientos,
+            "message": "✅ No se detectaron solapamientos" if len(solapamientos) == 0 else f"⚠️ Se detectaron {len(solapamientos)} solapamientos"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 

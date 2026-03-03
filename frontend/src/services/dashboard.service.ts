@@ -25,6 +25,7 @@ export interface DashboardData {
     victoria: boolean;
     delta: number;
   }>;
+  total_partidos: number;
   delta_semanal: number;
 }
 

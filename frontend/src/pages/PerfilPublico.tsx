@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ArrowLeft, 
   Trophy, 
@@ -15,7 +15,9 @@ import {
   Zap,
   Users,
   Share2,
-  User
+  User,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import Button from '../components/Button';
 import LoadingSkeleton from '../components/LoadingSkeleton';
@@ -121,19 +123,19 @@ export default function PerfilPublico() {
       
       clientLogger.userAction('View public profile', { username });
       
-      // Cargar perfil
+      // Cargar perfil primero (rápido)
       const perfilData = await perfilService.getPerfilPublico(username);
       console.log('Perfil data:', perfilData); // Debug
       setPerfil(perfilData);
       
-      // Cargar estadísticas y partidos en paralelo
-      const [estadisticasData, partidosData] = await Promise.all([
+      // Cargar estadísticas y partidos en paralelo (en segundo plano)
+      Promise.all([
         perfilService.getEstadisticas(perfilData.id_usuario).catch(() => null),
-        perfilService.getHistorial(perfilData.id_usuario).catch(() => [])
-      ]);
-      
-      setEstadisticas(estadisticasData);
-      setPartidos(partidosData);
+        perfilService.getHistorial(perfilData.id_usuario, 50).catch(() => [])
+      ]).then(([estadisticasData, partidosData]) => {
+        setEstadisticas(estadisticasData);
+        setPartidos(partidosData);
+      });
       
     } catch (err: any) {
       setError(err.message || 'Error al cargar el perfil');
@@ -193,6 +195,24 @@ export default function PerfilPublico() {
     } else {
       return `${partido.resultado.sets_eq2}-${partido.resultado.sets_eq1}`;
     }
+  };
+
+  const formatearDetalleSets = (partido: PartidoHistorial): string => {
+    if (!partido.resultado?.detalle_sets) return '';
+    const miEquipo = partido.jugadores.find(j => j.id_usuario === perfil?.id_usuario)?.equipo;
+    
+    return partido.resultado.detalle_sets.map(set => {
+      const misJuegos = miEquipo === 1 ? set.juegos_eq1 : set.juegos_eq2;
+      const rivalJuegos = miEquipo === 1 ? set.juegos_eq2 : set.juegos_eq1;
+      
+      // Solo mostrar tiebreak si existe y no es null
+      if (set.tiebreak_eq1 !== undefined && set.tiebreak_eq1 !== null && 
+          set.tiebreak_eq2 !== undefined && set.tiebreak_eq2 !== null) {
+        const miTiebreak = miEquipo === 1 ? set.tiebreak_eq1 : set.tiebreak_eq2;
+        return `${misJuegos}-${rivalJuegos}(${miTiebreak})`;
+      }
+      return `${misJuegos}-${rivalJuegos}`;
+    }).join(' / ');
   };
 
   const formatearFecha = (fecha: string): string => {
@@ -688,7 +708,7 @@ export default function PerfilPublico() {
                         </div>
 
                         {/* Equipos y Resultado */}
-                        <div className="grid grid-cols-12 gap-2 md:gap-4 items-center">
+                        <div className="grid grid-cols-12 gap-2 md:gap-4 items-center mb-2">
                           {/* Equipo del jugador */}
                           <div className="col-span-5">
                             {miEquipo.map((jugador, i) => (
@@ -706,28 +726,92 @@ export default function PerfilPublico() {
 
                           {/* Resultado */}
                           <div className="col-span-2 text-center">
-                            <span className={`text-lg md:text-xl font-black ${
+                            <p className={`text-lg md:text-3xl font-black leading-tight ${
                               victoria ? 'text-green-400' : 'text-red-400'
                             }`}>
                               {formatearSets(partido)}
-                            </span>
+                            </p>
+                            <p className="text-textSecondary text-[8px] md:text-xs hidden sm:block">
+                              {formatearDetalleSets(partido)}
+                            </p>
                           </div>
 
                           {/* Equipo rival */}
-                          <div className="col-span-5">
+                          <div className="col-span-5 text-right">
                             {rivalEquipo.map((jugador, i) => (
-                              <div key={i} className="truncate flex items-center gap-1">
+                              <div key={i} className="truncate flex items-center justify-end gap-1">
+                                <AdminId id={jugador.id_usuario} prefix="U" />
                                 <PlayerLink 
                                   id={jugador.id_usuario} 
                                   nombre={`${jugador.nombre} ${jugador.apellido}`}
                                   nombreUsuario={jugador.nombre_usuario}
                                   size="sm" 
                                 />
-                                <AdminId id={jugador.id_usuario} prefix="U" />
                               </div>
                             ))}
                           </div>
                         </div>
+
+                        {/* Detalles Expandibles */}
+                        <AnimatePresence>
+                          {detallesAbiertos.has(partido.id_partido) && partido.resultado?.detalle_sets && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.2 }}
+                              className="overflow-hidden"
+                            >
+                              <div className="mt-3 md:mt-4 pt-3 md:pt-4 border-t border-cardBorder">
+                                <h4 className="text-[10px] md:text-xs font-bold text-textSecondary mb-2">Detalle por Set</h4>
+                                <div className="space-y-1 md:space-y-2">
+                                  {partido.resultado.detalle_sets.map((set, idx) => {
+                                    const miEquipoNum = partido.jugadores.find(j => j.id_usuario === perfil?.id_usuario)?.equipo;
+                                    const misJuegos = miEquipoNum === 1 ? set.juegos_eq1 : set.juegos_eq2;
+                                    const rivalJuegos = miEquipoNum === 1 ? set.juegos_eq2 : set.juegos_eq1;
+                                    const ganeSet = misJuegos > rivalJuegos;
+
+                                    return (
+                                      <div key={idx} className={`flex items-center justify-between p-1.5 md:p-2 rounded ${
+                                        ganeSet ? 'bg-green-500/10' : 'bg-red-500/10'
+                                      }`}>
+                                        <span className="text-textSecondary text-[10px] md:text-xs">Set {set.set}</span>
+                                        <span className={`font-bold text-xs md:text-sm ${
+                                          ganeSet ? 'text-green-400' : 'text-red-400'
+                                        }`}>
+                                          {misJuegos} - {rivalJuegos}
+                                          {set.tiebreak_eq1 !== undefined && set.tiebreak_eq1 !== null && 
+                                           set.tiebreak_eq2 !== undefined && set.tiebreak_eq2 !== null && (
+                                            <span className="text-[10px] md:text-xs ml-1">
+                                              ({miEquipoNum === 1 ? set.tiebreak_eq1 : set.tiebreak_eq2})
+                                            </span>
+                                          )}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                                {partido.historial_rating && (
+                                  <div className="mt-2 md:mt-3 text-[10px] md:text-xs text-textSecondary space-y-0.5">
+                                    <p>Rating antes: {partido.historial_rating.rating_antes}</p>
+                                    <p>Rating después: {partido.historial_rating.rating_despues}</p>
+                                  </div>
+                                )}
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+
+                        {/* Botón Ver Detalles */}
+                        {partido.resultado && (
+                          <button 
+                            onClick={() => toggleDetalles(partido.id_partido)}
+                            className="absolute bottom-1 md:bottom-2 right-1 md:right-2 text-textSecondary hover:text-primary text-[10px] md:text-xs flex items-center gap-1 transition-colors"
+                          >
+                            {detallesAbiertos.has(partido.id_partido) ? 'ocultar' : 'detalles'}
+                            {detallesAbiertos.has(partido.id_partido) ? <ChevronUp size={10} className="md:w-3 md:h-3" /> : <ChevronDown size={10} className="md:w-3 md:h-3" />}
+                          </button>
+                        )}
                       </motion.div>
                       </div>
                     );

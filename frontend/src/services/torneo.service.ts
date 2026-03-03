@@ -466,6 +466,14 @@ class TorneoService {
     return response.data;
   }
 
+  async verificarSolapamientos(torneoId: number): Promise<any> {
+    const response = await axios.get(
+      `${API_URL}/torneos/${torneoId}/verificar-solapamientos`,
+      this.getAuthHeaders()
+    );
+    return response.data;
+  }
+
   async listarPartidos(torneoId: number, params?: { zona_id?: number; fase?: string }): Promise<any[]> {
     const response = await axios.get(`${API_URL}/torneos/${torneoId}/partidos`, { params });
     return response.data;

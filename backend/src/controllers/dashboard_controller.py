@@ -70,18 +70,33 @@ async def obtener_datos_dashboard(
             else:
                 top_femenino.append(jugador)
         
-        # QUERY 2: Últimos 3 partidos con DISTINCT ON para evitar duplicados
-        # Simplificado: usar solo delta para determinar victoria
-        partidos_query = text("""
-            SELECT DISTINCT ON (p.id_partido)
-                p.id_partido,
-                p.fecha,
-                h.delta
+        # QUERY 2: Contar TODOS los partidos del usuario (con resultado o historial)
+        count_query = text("""
+            SELECT COUNT(DISTINCT p.id_partido)
             FROM partido_jugadores pj
             JOIN partidos p ON pj.id_partido = p.id_partido
+            WHERE pj.id_usuario = :user_id
+              AND (
+                EXISTS (SELECT 1 FROM resultados_partidos WHERE id_partido = p.id_partido)
+                OR EXISTS (SELECT 1 FROM historial_rating WHERE id_partido = p.id_partido AND id_usuario = :user_id)
+              )
+        """)
+        
+        total_partidos_result = db.execute(count_query, {"user_id": user_id}).fetchone()
+        total_partidos = int(total_partidos_result[0]) if total_partidos_result else 0
+        
+        # Últimos 3 partidos SIMPLIFICADO - solo traer lo básico
+        partidos_query = text("""
+            SELECT p.id_partido, p.fecha, h.delta
+            FROM partidos p
+            JOIN partido_jugadores pj ON p.id_partido = pj.id_partido
             LEFT JOIN historial_rating h ON p.id_partido = h.id_partido AND h.id_usuario = :user_id
             WHERE pj.id_usuario = :user_id
-            ORDER BY p.id_partido, p.fecha DESC
+              AND (
+                EXISTS (SELECT 1 FROM resultados_partidos WHERE id_partido = p.id_partido)
+                OR h.delta IS NOT NULL
+              )
+            ORDER BY p.fecha DESC
             LIMIT 3
         """)
         
@@ -121,6 +136,7 @@ async def obtener_datos_dashboard(
             "top_masculino": top_masculino,
             "top_femenino": top_femenino,
             "ultimos_partidos": partidos_data,
+            "total_partidos": total_partidos,  # Agregar total de partidos
             "delta_semanal": delta_semanal
         }
         

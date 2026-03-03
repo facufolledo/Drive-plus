@@ -38,6 +38,9 @@ export default function TorneoFixture({ torneoId, esOrganizador }: TorneoFixture
   const [modalCambiarHorarioOpen, setModalCambiarHorarioOpen] = useState(false);
   const [storyViewOpen, setStoryViewOpen] = useState(false);
   const [torneoNombre, setTorneoNombre] = useState('');
+  const [verificando, setVerificando] = useState(false);
+  const [solapamientos, setSolapamientos] = useState<any[]>([]);
+  const [modalSolapamientosOpen, setModalSolapamientosOpen] = useState(false);
 
   // Helper para parsear fechas sin conversión de zona horaria
   const parseFechaLocal = (fechaStr: string) => {
@@ -227,6 +230,40 @@ export default function TorneoFixture({ torneoId, esOrganizador }: TorneoFixture
     }
   };
 
+  const verificarSolapamientos = async () => {
+    console.log('🔍 Verificando solapamientos...');
+    try {
+      setVerificando(true);
+      setError(null);
+      setSolapamientos([]);
+      
+      console.log('📡 Llamando al endpoint...');
+      const resultado = await torneoService.verificarSolapamientos(torneoId);
+      console.log('✅ Resultado:', resultado);
+      
+      if (resultado.total_solapamientos === 0) {
+        setError('✅ No se detectaron solapamientos en el fixture');
+        setTimeout(() => setError(null), 3000);
+      } else {
+        setSolapamientos(resultado.solapamientos);
+        setModalSolapamientosOpen(true);
+      }
+    } catch (error: any) {
+      console.error('❌ Error al verificar solapamientos:', error);
+      
+      let errorMsg = 'Error al verificar solapamientos';
+      if (error.response?.data?.detail) {
+        errorMsg = error.response.data.detail;
+      } else if (error.message) {
+        errorMsg = error.message;
+      }
+      
+      setError(`❌ ${errorMsg}`);
+    } finally {
+      setVerificando(false);
+    }
+  };
+
   const abrirModalResultado = (partido: any) => {
     setPartidoSeleccionado(partido);
     setModalResultadoOpen(true);
@@ -272,34 +309,37 @@ export default function TorneoFixture({ torneoId, esOrganizador }: TorneoFixture
   if (partidos.length === 0) {
     return (
       <Card>
-        <div className="p-6 text-center">
-          <Calendar size={48} className="mx-auto text-textSecondary mb-4" />
-          <h3 className="text-xl font-bold text-textPrimary mb-2">
-            Aún no se generó el fixture
-          </h3>
-          <p className="text-textSecondary mb-6">
-            El fixture se genera después de crear las zonas
-          </p>
+        <div className="p-6">
+          {/* Header compacto */}
+          <div className="flex items-center gap-3 mb-4">
+            <div className="bg-primary/10 p-2.5 rounded-lg">
+              <Calendar size={20} className="text-primary" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-textPrimary">Generar Fixture</h3>
+              <p className="text-xs text-textSecondary">El fixture se genera después de crear las zonas</p>
+            </div>
+          </div>
           
           {/* Mensaje de error/éxito */}
           {error && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className={`mb-4 p-4 rounded-lg flex items-start gap-3 ${
+              className={`mb-4 p-3 rounded-lg flex items-start gap-2 ${
                 error.startsWith('✅') 
                   ? 'bg-green-500/10 border border-green-500/30' 
                   : 'bg-red-500/10 border border-red-500/30'
               }`}
             >
               <AlertCircle 
-                size={20} 
+                size={16} 
                 className={`flex-shrink-0 mt-0.5 ${
                   error.startsWith('✅') ? 'text-green-500' : 'text-red-500'
                 }`} 
               />
               <div className="flex-1 text-left">
-                <p className={`font-medium text-sm ${
+                <p className={`font-medium text-xs ${
                   error.startsWith('✅') ? 'text-green-500' : 'text-red-500'
                 }`}>
                   {typeof error === 'string' ? error : 'Error inesperado'}
@@ -313,85 +353,52 @@ export default function TorneoFixture({ torneoId, esOrganizador }: TorneoFixture
                     : 'text-red-500/70 hover:text-red-500'
                 }`}
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </motion.div>
           )}
           
           {esOrganizador && (
-            <div className="space-y-3">
-              {/* Botones de generar */}
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  onClick={() => generarFixture()}
-                  disabled={generando}
-                  variant="accent"
-                  className="flex-1 min-w-[200px]"
-                >
-                  {generando ? 'Generando...' : 'Generar Fixture Completo'}
-                </Button>
+            <div className="space-y-4">
+              {/* Estado */}
+              <div className="p-3 bg-background rounded-lg border border-cardBorder/50">
+                <p className="text-xs text-textSecondary mb-1">Estado:</p>
+                <p className="text-sm font-bold text-textPrimary">Aún no se generó el fixture</p>
               </div>
               
-              {/* Botones por categoría - SIEMPRE MOSTRAR si hay categorías */}
+              {/* Generar por categoría */}
               {categorias.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-sm text-textSecondary font-medium">
-                  {partidos.length > 0 ? 'Generar/Regenerar por categoría:' : 'O generar por categoría:'}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {categorias.map(cat => {
-                    const esF = cat.genero === 'femenino';
-                    const esMixto = cat.genero === 'mixto';
-                    const icon = esMixto ? '⚥' : esF ? '♀' : '♂';
-                    const colorClass = esMixto 
-                      ? 'from-purple-500 to-purple-600' 
-                      : esF 
-                        ? 'from-pink-500 to-pink-600' 
-                        : 'from-blue-500 to-blue-600';
-                    
-                    return (
-                      <Button
-                        key={cat.id}
-                        onClick={() => generarFixture(cat.id)}
-                        disabled={generando}
-                        variant="secondary"
-                        className={`flex items-center gap-2 bg-gradient-to-r ${colorClass} text-white hover:opacity-90`}
-                      >
-                        <span>{icon}</span>
-                        <span>{cat.nombre}</span>
-                      </Button>
-                    );
-                  })}
+                <div>
+                  <p className="text-sm font-bold text-textSecondary mb-2">Generar por categoría:</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {categorias.map(cat => {
+                      const colorClass = cat.genero === 'masculino'
+                        ? 'border-blue-500/50 hover:border-blue-500 hover:bg-blue-500/10 text-blue-400'
+                        : cat.genero === 'femenino'
+                        ? 'border-pink-500/50 hover:border-pink-500 hover:bg-pink-500/10 text-pink-400'
+                        : 'border-purple-500/50 hover:border-purple-500 hover:bg-purple-500/10 text-purple-400';
+                      
+                      return (
+                        <button
+                          key={cat.id}
+                          onClick={() => generarFixture(cat.id)}
+                          disabled={generando}
+                          className={`p-3 rounded-lg border-2 transition-all font-bold text-sm ${colorClass} ${
+                            generando ? 'opacity-50 cursor-not-allowed' : ''
+                          }`}
+                        >
+                          {cat.nombre}
+                          <span className="block text-[10px] text-textSecondary mt-0.5">
+                            {cat.parejas_inscritas} parejas
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
-            
-            {/* Botones de eliminar (solo si hay partidos) */}
-            {partidos.length > 0 && (
-              <div className="flex flex-wrap gap-2 pt-2 border-t border-cardBorder/50">
-                <Button
-                  onClick={() => eliminarFixture()}
-                  disabled={generando}
-                  variant="danger"
-                  size="sm"
-                  className="flex-1 min-w-[180px]"
-                >
-                  {generando ? 'Eliminando...' : 'Eliminar Todo el Fixture'}
-                </Button>
-                
-                {categoriaFiltro && (
-                  <Button
-                    onClick={() => eliminarFixture(categoriaFiltro)}
-                    disabled={generando}
-                    variant="danger"
-                    size="sm"
-                    className="flex-1 min-w-[180px]"
-                  >
-                    {generando ? 'Eliminando...' : 'Eliminar Esta Categoría'}
-                  </Button>
-                )}
-              </div>
-            )}
+              )}
+              
+              {/* Botón verificar solapamientos - REMOVIDO, ahora está arriba */}
             </div>
           )}
         </div>
@@ -447,6 +454,48 @@ export default function TorneoFixture({ torneoId, esOrganizador }: TorneoFixture
 
   return (
     <div className="space-y-6">
+      {/* Mensaje de error/éxito - MEJORADO */}
+      {error && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.95 }}
+          className={`p-4 rounded-xl flex items-center gap-3 shadow-lg ${
+            error.startsWith('✅') 
+              ? 'bg-gradient-to-r from-green-500/20 to-emerald-500/20 border-2 border-green-500/50' 
+              : 'bg-gradient-to-r from-red-500/20 to-rose-500/20 border-2 border-red-500/50'
+          }`}
+        >
+          <div className={`p-2 rounded-lg ${
+            error.startsWith('✅') ? 'bg-green-500/20' : 'bg-red-500/20'
+          }`}>
+            <AlertCircle 
+              size={20} 
+              className={error.startsWith('✅') ? 'text-green-500' : 'text-red-500'} 
+            />
+          </div>
+          <div className="flex-1">
+            <p className={`font-bold text-sm ${
+              error.startsWith('✅') ? 'text-green-500' : 'text-red-500'
+            }`}>
+              {typeof error === 'string' ? error : 'Error inesperado'}
+            </p>
+          </div>
+          <button
+            onClick={() => setError(null)}
+            className={`p-2 rounded-lg transition-colors ${
+              error.startsWith('✅') 
+                ? 'hover:bg-green-500/20 text-green-500' 
+                : 'hover:bg-red-500/20 text-red-500'
+            }`}
+          >
+            <X size={18} />
+          </button>
+        </motion.div>
+      )}
+
+      {/* Alerta de solapamientos detectados - REMOVIDA, ahora se muestra en modal */}
+
       {/* Alerta de partidos no programados */}
       {partidosNoProgramados.length > 0 && (
         <motion.div
@@ -549,84 +598,6 @@ export default function TorneoFixture({ torneoId, esOrganizador }: TorneoFixture
         </div>
       )}
 
-      {/* BOTONES DE GENERAR Y ELIMINAR FIXTURE */}
-      {esOrganizador && (
-        <Card>
-          <div className="p-4 space-y-3">
-            {/* Botones de generar */}
-            <div className="flex flex-wrap gap-2">
-              <Button
-                onClick={() => generarFixture()}
-                disabled={generando}
-                variant="accent"
-                size="sm"
-                className="flex-1 min-w-[180px]"
-              >
-                {generando ? 'Generando...' : 'Regenerar Fixture Completo'}
-              </Button>
-            </div>
-            
-            {/* Botones por categoría */}
-            {categorias.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-sm text-textSecondary font-medium">Generar/Regenerar por categoría:</p>
-                <div className="flex flex-wrap gap-2">
-                  {categorias.map(cat => {
-                    const esF = cat.genero === 'femenino';
-                    const esMixto = cat.genero === 'mixto';
-                    const icon = esMixto ? '⚥' : esF ? '♀' : '♂';
-                    const colorClass = esMixto 
-                      ? 'from-purple-500 to-purple-600' 
-                      : esF 
-                        ? 'from-pink-500 to-pink-600' 
-                        : 'from-blue-500 to-blue-600';
-                    
-                    return (
-                      <Button
-                        key={cat.id}
-                        onClick={() => generarFixture(cat.id)}
-                        disabled={generando}
-                        variant="secondary"
-                        size="sm"
-                        className={`flex items-center gap-2 bg-gradient-to-r ${colorClass} text-white hover:opacity-90`}
-                      >
-                        <span>{icon}</span>
-                        <span>{cat.nombre}</span>
-                      </Button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-            
-            {/* Botones de eliminar */}
-            <div className="flex flex-wrap gap-2 pt-2 border-t border-cardBorder/50">
-              <Button
-                onClick={() => eliminarFixture()}
-                disabled={generando}
-                variant="danger"
-                size="sm"
-                className="flex-1 min-w-[180px]"
-              >
-                {generando ? 'Eliminando...' : 'Eliminar Todo el Fixture'}
-              </Button>
-              
-              {categoriaFiltro && (
-                <Button
-                  onClick={() => eliminarFixture(categoriaFiltro)}
-                  disabled={generando}
-                  variant="danger"
-                  size="sm"
-                  className="flex-1 min-w-[180px]"
-                >
-                  {generando ? 'Eliminando...' : `Eliminar ${categorias.find(c => c.id === categoriaFiltro)?.nombre || 'Categoría'}`}
-                </Button>
-              )}
-            </div>
-          </div>
-        </Card>
-      )}
-
       {/* Header con filtros de zona y botón de captura */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2 overflow-x-auto">
@@ -649,6 +620,20 @@ export default function TorneoFixture({ torneoId, esOrganizador }: TorneoFixture
         </div>
         
         <div className="flex items-center gap-2 self-end sm:self-auto">
+          {/* Botón verificar solapamientos - solo si hay partidos */}
+          {esOrganizador && partidos.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={verificarSolapamientos}
+              disabled={verificando}
+              className="flex items-center gap-2 text-xs bg-accent/10 border border-accent/30 hover:bg-accent/20 text-accent"
+            >
+              <AlertCircle size={14} />
+              {verificando ? 'Verificando...' : 'Verificar solapamientos'}
+            </Button>
+          )}
+          
           {/* Botón planilla para Instagram */}
           <Button
             variant="ghost"
@@ -925,6 +910,113 @@ export default function TorneoFixture({ torneoId, esOrganizador }: TorneoFixture
         canchas={canchas}
         parseFechaLocal={parseFechaLocal}
       />
+
+      {/* Modal de Solapamientos */}
+      {modalSolapamientosOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-card rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden"
+          >
+            {/* Header */}
+            <div className="p-6 border-b border-cardBorder bg-gradient-to-r from-red-500/10 to-rose-500/10">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-red-500/20 rounded-lg">
+                    <AlertCircle size={24} className="text-red-500" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-red-500">Solapamientos Detectados</h3>
+                    <p className="text-sm text-textSecondary">
+                      Se encontraron {solapamientos.length} conflicto{solapamientos.length > 1 ? 's' : ''} en el fixture
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setModalSolapamientosOpen(false)}
+                  className="p-2 hover:bg-cardBorder rounded-lg transition-colors"
+                >
+                  <X size={20} className="text-textSecondary" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 overflow-y-auto max-h-[calc(80vh-120px)]">
+              <div className="space-y-4">
+                {solapamientos.map((solap: any, idx: number) => (
+                  <motion.div
+                    key={idx}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.1 }}
+                    className="p-4 bg-background rounded-lg border-2 border-red-500/30"
+                  >
+                    {/* Tipo de conflicto */}
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-2xl">
+                        {solap.tipo === 'cancha' ? '🏟️' : '👥'}
+                      </span>
+                      <div className="flex-1">
+                        <h4 className="font-bold text-red-500">
+                          {solap.tipo === 'cancha' ? 'Conflicto de Cancha' : 'Conflicto de Pareja'}
+                        </h4>
+                        <p className="text-xs text-textSecondary">{solap.mensaje}</p>
+                      </div>
+                    </div>
+
+                    {/* Partidos en conflicto */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="p-3 bg-cardBg rounded-lg border border-cardBorder">
+                        <p className="text-xs text-textSecondary mb-2">Partido #{solap.partido1.id}</p>
+                        <p className="font-bold text-textPrimary text-sm mb-1">
+                          {new Date(solap.partido1.fecha_hora).toLocaleString('es-ES', {
+                            weekday: 'short',
+                            day: 'numeric',
+                            month: 'short',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </p>
+                        {solap.partido1.cancha_id && (
+                          <p className="text-xs text-accent">Cancha {solap.partido1.cancha_id}</p>
+                        )}
+                      </div>
+                      <div className="p-3 bg-cardBg rounded-lg border border-cardBorder">
+                        <p className="text-xs text-textSecondary mb-2">Partido #{solap.partido2.id}</p>
+                        <p className="font-bold text-textPrimary text-sm mb-1">
+                          {new Date(solap.partido2.fecha_hora).toLocaleString('es-ES', {
+                            weekday: 'short',
+                            day: 'numeric',
+                            month: 'short',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </p>
+                        {solap.partido2.cancha_id && (
+                          <p className="text-xs text-accent">Cancha {solap.partido2.cancha_id}</p>
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-cardBorder bg-background">
+              <Button
+                variant="primary"
+                onClick={() => setModalSolapamientosOpen(false)}
+                className="w-full"
+              >
+                Entendido
+              </Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

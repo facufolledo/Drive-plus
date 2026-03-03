@@ -109,35 +109,41 @@ export default function TorneoDetalle() {
       {/* Información del Torneo */}
       <Card>
         <div className="p-6">
-          <div className="flex items-start justify-between mb-6">
+          <div className="flex items-start justify-between gap-4 mb-6">
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-2">
                 <div className="bg-accent/10 p-3 rounded-lg">
                   <Trophy className="text-accent" size={32} />
                 </div>
                 <div>
-                  <h1 className="text-3xl font-bold text-textPrimary">{torneoActual.nombre}</h1>
+                  <h1 className="text-2xl md:text-3xl font-bold text-textPrimary">{torneoActual.nombre}</h1>
                   <p className="text-textSecondary">Categoría {torneoActual.categoria}</p>
                 </div>
               </div>
             </div>
             
-            {esOrganizador && (
-              <Button variant="ghost" className="flex items-center gap-2" onClick={() => setModalEditarOpen(true)}>
-                <Settings size={18} />
-                Gestionar
-              </Button>
-            )}
-          </div>
-
-          {/* Estado */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary mb-6">
-            <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-            <span className="font-bold text-sm">
-              {torneoActual.estado === 'programado' && 'Inscripciones Abiertas'}
-              {torneoActual.estado === 'activo' && 'En Curso'}
-              {torneoActual.estado === 'finalizado' && 'Finalizado'}
-            </span>
+            {/* Estado PROTAGONISTA - Badge grande */}
+            <div className="flex flex-col items-end gap-3">
+              <div className={`inline-flex items-center gap-2 px-5 py-3 rounded-xl font-black text-sm uppercase tracking-wider shadow-lg ${
+                torneoActual.estado === 'programado' 
+                  ? 'bg-gradient-to-r from-emerald-600/80 to-emerald-700/80 text-white border-2 border-emerald-500/50'
+                  : torneoActual.estado === 'activo'
+                  ? 'bg-gradient-to-r from-primary to-blue-600 text-white border-2 border-primary'
+                  : 'bg-gradient-to-r from-gray-500 to-gray-600 text-white border-2 border-gray-400'
+              }`}>
+                <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" />
+                {torneoActual.estado === 'programado' && 'Inscripciones Abiertas'}
+                {torneoActual.estado === 'activo' && 'En Curso'}
+                {torneoActual.estado === 'finalizado' && 'Finalizado'}
+              </div>
+              
+              {esOrganizador && (
+                <Button variant="ghost" className="flex items-center gap-2 text-xs" onClick={() => setModalEditarOpen(true)}>
+                  <Settings size={16} />
+                  Gestionar
+                </Button>
+              )}
+            </div>
           </div>
 
           {/* Información básica */}
@@ -178,12 +184,12 @@ export default function TorneoDetalle() {
             </div>
           </div>
 
-          {/* Horarios del torneo */}
+          {/* Horarios del torneo - MEJORADO */}
           {(() => {
             const horarios = (torneoActual as any).horarios_disponibles;
             if (!horarios) return null;
             
-            // Formato nuevo: por día específico (viernes, sabado, domingo, etc.)
+            // Formato nuevo: por día específico
             const diasConHorarios = Object.entries(horarios).filter(([key]) => 
               !['semana', 'finDeSemana'].includes(key)
             );
@@ -194,42 +200,42 @@ export default function TorneoDetalle() {
             if (diasConHorarios.length === 0 && !tieneFormatoAntiguo) return null;
             
             const nombresDias: Record<string, string> = {
-              'lunes': 'Lun',
-              'martes': 'Mar',
-              'miercoles': 'Mié',
-              'jueves': 'Jue',
-              'viernes': 'Vie',
-              'sabado': 'Sáb',
-              'domingo': 'Dom'
+              'lunes': 'Lunes',
+              'martes': 'Martes',
+              'miercoles': 'Miércoles',
+              'jueves': 'Jueves',
+              'viernes': 'Viernes',
+              'sabado': 'Sábado',
+              'domingo': 'Domingo'
             };
             
             return (
-              <div className="mb-6 p-4 bg-background rounded-lg border border-primary/30">
-                <h3 className="font-bold text-textPrimary mb-3 flex items-center gap-2">
-                  <Clock className="text-primary" size={20} />
+              <div className="mb-6 p-5 bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl border-2 border-primary/30">
+                <h3 className="font-black text-textPrimary mb-4 flex items-center gap-2 text-lg">
+                  <Clock className="text-primary" size={22} />
                   Horarios del Torneo
                 </h3>
-                <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3">
+                <div className="space-y-2">
                   {/* Formato nuevo: por día */}
                   {diasConHorarios.map(([dia, horario]: [string, any]) => (
-                    <div key={dia} className="flex items-center gap-2 bg-cardBg px-3 py-2 rounded-lg">
-                      <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-1 rounded capitalize">
+                    <div key={dia} className="flex items-center justify-between bg-cardBg px-4 py-3 rounded-lg border border-cardBorder hover:border-primary/50 transition-colors">
+                      <span className="text-sm font-black text-textPrimary capitalize min-w-[100px]">
                         {nombresDias[dia] || dia}
                       </span>
-                      <span className="text-sm text-textPrimary font-medium">
-                        {horario.inicio} - {horario.fin}
+                      <span className="text-sm text-textSecondary font-bold">
+                        {horario.inicio} – {horario.fin}
                       </span>
                     </div>
                   ))}
                   
                   {/* Formato antiguo: semana y fin de semana */}
                   {horarios.semana && horarios.semana.length > 0 && (
-                    <div className="flex items-center gap-2 bg-cardBg px-3 py-2 rounded-lg">
-                      <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-1 rounded">Lun-Vie</span>
-                      <span className="text-sm text-textPrimary font-medium">
+                    <div className="flex items-center justify-between bg-cardBg px-4 py-3 rounded-lg border border-cardBorder">
+                      <span className="text-sm font-black text-textPrimary min-w-[100px]">Lun-Vie</span>
+                      <span className="text-sm text-textSecondary font-bold">
                         {horarios.semana.map((franja: any, idx: number) => (
                           <span key={idx}>
-                            {franja.desde} - {franja.hasta}
+                            {franja.desde} – {franja.hasta}
                             {idx < horarios.semana.length - 1 && ' | '}
                           </span>
                         ))}
@@ -237,12 +243,12 @@ export default function TorneoDetalle() {
                     </div>
                   )}
                   {horarios.finDeSemana && horarios.finDeSemana.length > 0 && (
-                    <div className="flex items-center gap-2 bg-cardBg px-3 py-2 rounded-lg">
-                      <span className="text-xs font-bold text-accent bg-accent/10 px-2 py-1 rounded">Sáb-Dom</span>
-                      <span className="text-sm text-textPrimary font-medium">
+                    <div className="flex items-center justify-between bg-cardBg px-4 py-3 rounded-lg border border-cardBorder">
+                      <span className="text-sm font-black text-textPrimary min-w-[100px]">Sáb-Dom</span>
+                      <span className="text-sm text-textSecondary font-bold">
                         {horarios.finDeSemana.map((franja: any, idx: number) => (
                           <span key={idx}>
-                            {franja.desde} - {franja.hasta}
+                            {franja.desde} – {franja.hasta}
                             {idx < horarios.finDeSemana.length - 1 && ' | '}
                           </span>
                         ))}
@@ -305,76 +311,120 @@ export default function TorneoDetalle() {
         </div>
       </Card>
 
-      {/* Tabs */}
-      <div className="flex gap-2 border-b border-cardBorder overflow-x-auto">
-        <button
-          onClick={() => setTab('info')}
-          className={`px-4 py-2 font-bold transition-colors whitespace-nowrap ${
-            tab === 'info'
-              ? 'text-primary border-b-2 border-primary'
-              : 'text-textSecondary hover:text-textPrimary'
-          }`}
-        >
-          Información
-        </button>
-        {/* Parejas solo visible para organizador */}
-        {esOrganizador && (
+      {/* Tabs - MEJORADOS con línea más fuerte y animación */}
+      <div className="relative border-b-2 border-cardBorder/50 overflow-x-auto">
+        <div className="flex gap-1">
           <button
-            onClick={() => setTab('parejas')}
-            className={`px-4 py-2 font-bold transition-colors whitespace-nowrap ${
-              tab === 'parejas'
-                ? 'text-primary border-b-2 border-primary'
+            onClick={() => setTab('info')}
+            className={`relative px-5 py-3 font-black transition-all whitespace-nowrap ${
+              tab === 'info'
+                ? 'text-primary'
                 : 'text-textSecondary hover:text-textPrimary'
             }`}
           >
-            Parejas ({parejas.length})
+            Información
+            {tab === 'info' && (
+              <motion.div
+                layoutId="activeTab"
+                className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-primary to-accent rounded-t-full shadow-lg shadow-primary/50"
+                transition={{ type: "spring", stiffness: 380, damping: 30 }}
+              />
+            )}
           </button>
-        )}
-        <button
-          onClick={() => setTab('zonas')}
-          className={`px-4 py-2 font-bold transition-colors whitespace-nowrap ${
-            tab === 'zonas'
-              ? 'text-primary border-b-2 border-primary'
-              : 'text-textSecondary hover:text-textPrimary'
-          }`}
-        >
-          Zonas
-        </button>
-        <button
-          onClick={() => setTab('partidos')}
-          className={`px-4 py-2 font-bold transition-colors whitespace-nowrap ${
-            tab === 'partidos'
-              ? 'text-primary border-b-2 border-primary'
-              : 'text-textSecondary hover:text-textPrimary'
-          }`}
-        >
-          Fixture
-        </button>
-        <button
-          onClick={() => setTab('playoffs')}
-          className={`px-4 py-2 font-bold transition-colors whitespace-nowrap flex items-center gap-2 ${
-            tab === 'playoffs'
-              ? 'text-accent border-b-2 border-accent'
-              : 'text-textSecondary hover:text-textPrimary'
-          }`}
-        >
-          <Trophy size={16} />
-          Playoffs
-        </button>
-        {/* Programación solo visible para organizador */}
-        {esOrganizador && (
+          {/* Parejas solo visible para organizador */}
+          {esOrganizador && (
+            <button
+              onClick={() => setTab('parejas')}
+              className={`relative px-5 py-3 font-black transition-all whitespace-nowrap ${
+                tab === 'parejas'
+                  ? 'text-primary'
+                  : 'text-textSecondary hover:text-textPrimary'
+              }`}
+            >
+              Parejas ({parejas.length})
+              {tab === 'parejas' && (
+                <motion.div
+                  layoutId="activeTab"
+                  className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-primary to-accent rounded-t-full shadow-lg shadow-primary/50"
+                  transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                />
+              )}
+            </button>
+          )}
           <button
-            onClick={() => setTab('programacion')}
-            className={`px-4 py-2 font-bold transition-colors whitespace-nowrap flex items-center gap-2 ${
-              tab === 'programacion'
-                ? 'text-primary border-b-2 border-primary'
+            onClick={() => setTab('zonas')}
+            className={`relative px-5 py-3 font-black transition-all whitespace-nowrap ${
+              tab === 'zonas'
+                ? 'text-primary'
                 : 'text-textSecondary hover:text-textPrimary'
             }`}
           >
-            <Settings size={16} />
-            Programación
+            Zonas
+            {tab === 'zonas' && (
+              <motion.div
+                layoutId="activeTab"
+                className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-primary to-accent rounded-t-full shadow-lg shadow-primary/50"
+                transition={{ type: "spring", stiffness: 380, damping: 30 }}
+              />
+            )}
           </button>
-        )}
+          <button
+            onClick={() => setTab('partidos')}
+            className={`relative px-5 py-3 font-black transition-all whitespace-nowrap ${
+              tab === 'partidos'
+                ? 'text-primary'
+                : 'text-textSecondary hover:text-textPrimary'
+            }`}
+          >
+            Fixture
+            {tab === 'partidos' && (
+              <motion.div
+                layoutId="activeTab"
+                className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-primary to-accent rounded-t-full shadow-lg shadow-primary/50"
+                transition={{ type: "spring", stiffness: 380, damping: 30 }}
+              />
+            )}
+          </button>
+          <button
+            onClick={() => setTab('playoffs')}
+            className={`relative px-5 py-3 font-black transition-all whitespace-nowrap flex items-center gap-2 ${
+              tab === 'playoffs'
+                ? 'text-accent'
+                : 'text-textSecondary hover:text-textPrimary'
+            }`}
+          >
+            <Trophy size={16} />
+            Playoffs
+            {tab === 'playoffs' && (
+              <motion.div
+                layoutId="activeTab"
+                className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-accent to-yellow-500 rounded-t-full shadow-lg shadow-accent/50"
+                transition={{ type: "spring", stiffness: 380, damping: 30 }}
+              />
+            )}
+          </button>
+          {/* Programación solo visible para organizador */}
+          {esOrganizador && (
+            <button
+              onClick={() => setTab('programacion')}
+              className={`relative px-5 py-3 font-black transition-all whitespace-nowrap flex items-center gap-2 ${
+                tab === 'programacion'
+                  ? 'text-primary'
+                  : 'text-textSecondary hover:text-textPrimary'
+              }`}
+            >
+              <Settings size={16} />
+              Programación
+              {tab === 'programacion' && (
+                <motion.div
+                  layoutId="activeTab"
+                  className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-primary to-accent rounded-t-full shadow-lg shadow-primary/50"
+                  transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                />
+              )}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Contenido de tabs */}
