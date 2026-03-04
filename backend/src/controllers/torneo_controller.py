@@ -256,6 +256,9 @@ def listar_torneos(
         
         query = db.query(Torneo)
         
+        # FILTRAR TORNEOS OCULTOS (no mostrar en listado público)
+        query = query.filter(Torneo.estado != 'oculto')
+        
         if estado:
             query = query.filter(Torneo.estado == estado)
         
