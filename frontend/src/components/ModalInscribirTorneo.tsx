@@ -27,6 +27,7 @@ interface ModalInscribirTorneoProps {
   esOrganizador?: boolean;
   fechaInicio?: string;
   fechaFin?: string;
+  onInscripcionExitosa?: () => void;
 }
 
 export default function ModalInscribirTorneo({
@@ -37,6 +38,7 @@ export default function ModalInscribirTorneo({
   esOrganizador = false,
   fechaInicio,
   fechaFin,
+  onInscripcionExitosa,
 }: ModalInscribirTorneoProps) {
   const { loading } = useTorneos();
   const { usuario } = useAuth();
@@ -293,6 +295,11 @@ export default function ModalInscribirTorneo({
 
   const handleClose = () => {
     if (!loading) {
+      // Si hubo éxito, notificar al padre para que recargue datos
+      if (success && onInscripcionExitosa) {
+        onInscripcionExitosa();
+      }
+      
       onClose();
       setError('');
       setSuccess(false);

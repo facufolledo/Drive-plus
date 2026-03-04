@@ -482,6 +482,11 @@ export default function TorneoDetalle() {
         esOrganizador={esOrganizador}
         fechaInicio={torneoActual?.fecha_inicio}
         fechaFin={torneoActual?.fecha_fin}
+        onInscripcionExitosa={() => {
+          // Recargar datos del torneo y parejas después de inscripción exitosa
+          cargarTorneo(parseInt(id!));
+          cargarParejas(parseInt(id!));
+        }}
       />
 
       <GestionOrganizadores
