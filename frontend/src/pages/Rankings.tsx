@@ -149,7 +149,6 @@ export default function Rankings() {
                 <p className="text-white/90 text-[10px] md:text-xs font-semibold mt-0.5 relative z-10">
                   {cat.ratingMin === 1800 ? `${cat.ratingMin}+` : `${cat.ratingMin}-${cat.ratingMax}`}
                 </p>
-                <p className="text-white/70 text-[8px] md:text-[9px] mt-0.5 line-clamp-2 relative z-10 hidden md:block">{cat.descripcion}</p>
               </motion.div>
             ))}
           </div>
