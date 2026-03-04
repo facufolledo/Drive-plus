@@ -122,24 +122,34 @@ export default function Rankings() {
         <p className="text-textSecondary text-xs md:text-base ml-10 md:ml-15">Tabla general de jugadores</p>
       </motion.div>
 
-      {/* Sistema de categorías compacto */}
+      {/* Sistema de categorías informativo */}
       <Card>
-        <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <Trophy className="text-accent" size={18} />
-            <span className="text-textPrimary font-bold text-sm">Categorías</span>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Trophy className="text-accent" size={18} />
+              <h3 className="text-textPrimary font-bold text-sm md:text-base">Sistema de Categorías</h3>
+            </div>
+            <p className="text-textSecondary text-[9px] md:text-xs">Rating ELO • Ascenso automático</p>
           </div>
-          <div className="flex items-center gap-1.5 md:gap-2 flex-wrap flex-1">
+          <p className="text-textSecondary text-[10px] md:text-xs">
+            Tu categoría se actualiza automáticamente cuando alcanzás el rating mínimo. ¡Seguí ganando para subir de nivel!
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-1.5 md:gap-2">
             {CATEGORIAS.map((cat, index) => (
               <motion.div
                 key={cat.nombre}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: index * 0.03 }}
-                className={`bg-gradient-to-r ${cat.color} px-2 md:px-3 py-1 rounded-md flex items-center gap-1`}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.04 }}
+                className={`bg-gradient-to-br ${cat.color} p-2 md:p-2.5 rounded-lg text-center relative overflow-hidden group cursor-pointer hover:scale-105 transition-transform`}
               >
-                <span className="text-white/70 text-[9px] md:text-xs font-semibold">{cat.ratingMin}+</span>
-                <span className="text-white font-bold text-[10px] md:text-sm">{cat.nombre}</span>
+                <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-colors" />
+                <p className="text-white font-black text-xs md:text-sm relative z-10">{cat.nombre}</p>
+                <p className="text-white/90 text-[10px] md:text-xs font-semibold mt-0.5 relative z-10">
+                  {cat.ratingMin === 1800 ? `${cat.ratingMin}+` : `${cat.ratingMin}-${cat.ratingMax}`}
+                </p>
+                <p className="text-white/70 text-[8px] md:text-[9px] mt-0.5 line-clamp-2 relative z-10 hidden md:block">{cat.descripcion}</p>
               </motion.div>
             ))}
           </div>
