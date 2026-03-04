@@ -122,28 +122,27 @@ export default function Rankings() {
         <p className="text-textSecondary text-xs md:text-base ml-10 md:ml-15">Tabla general de jugadores</p>
       </motion.div>
 
-      {/* Información del sistema de categorías */}
-      <Card gradient>
-        <div className="mb-2 md:mb-4">
-          <h2 className="text-sm md:text-xl font-bold text-textPrimary mb-1 md:mb-2">Sistema de Categorías</h2>
-          <p className="text-textSecondary text-[10px] md:text-sm">
-            El rating se calcula con el algoritmo ELO adaptado para pádel 2vs2. 
-            Tu categoría se actualiza automáticamente según tu rating.
-          </p>
-        </div>
-        <div className="grid grid-cols-4 md:grid-cols-4 lg:grid-cols-7 gap-1 md:gap-3">
-          {CATEGORIAS.map((cat, index) => (
-            <motion.div
-              key={cat.nombre}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-              className={`bg-gradient-to-br ${cat.color} p-1.5 md:p-3 rounded-lg text-center`}
-            >
-              <p className="text-white font-black text-[10px] md:text-lg">{cat.nombre}</p>
-              <p className="text-white/80 text-[8px] md:text-xs mt-0.5 md:mt-1">{cat.ratingMin}+</p>
-            </motion.div>
-          ))}
+      {/* Sistema de categorías compacto */}
+      <Card>
+        <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Trophy className="text-accent" size={18} />
+            <span className="text-textPrimary font-bold text-sm">Categorías</span>
+          </div>
+          <div className="flex items-center gap-1.5 md:gap-2 flex-wrap flex-1">
+            {CATEGORIAS.map((cat, index) => (
+              <motion.div
+                key={cat.nombre}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: index * 0.03 }}
+                className={`bg-gradient-to-r ${cat.color} px-2 md:px-3 py-1 rounded-md flex items-center gap-1`}
+              >
+                <span className="text-white/70 text-[9px] md:text-xs font-semibold">{cat.ratingMin}+</span>
+                <span className="text-white font-bold text-[10px] md:text-sm">{cat.nombre}</span>
+              </motion.div>
+            ))}
+          </div>
         </div>
       </Card>
 
@@ -168,14 +167,17 @@ export default function Rankings() {
             <span className="text-xs md:text-sm font-bold">Categoría:</span>
           </div>
           {['todas', ...CATEGORIAS.map(c => c.nombre)].map((cat) => (
-            <Button
+            <button
               key={cat}
-              variant={filtroCategoria === cat ? 'primary' : 'secondary'}
               onClick={() => setFiltroCategoria(cat)}
-              className="text-[10px] md:text-sm px-2 md:px-3 py-1 md:py-1.5"
+              className={`text-[10px] md:text-sm px-2 md:px-3 py-1 md:py-1.5 rounded-lg font-semibold transition-all ${
+                filtroCategoria === cat
+                  ? 'bg-primary text-white shadow-md'
+                  : 'border border-cardBorder text-textSecondary hover:border-primary/50 hover:text-textPrimary'
+              }`}
             >
               {cat === 'todas' ? 'Todas' : cat}
-            </Button>
+            </button>
           ))}
         </div>
 
@@ -186,40 +188,22 @@ export default function Rankings() {
             <span className="text-xs md:text-sm font-bold">Género:</span>
           </div>
           {[
-            { value: 'todos', label: 'Todos', icon: '🏆', color: 'from-purple-500 to-purple-600' },
-            { value: 'masculino', label: 'Masculino', icon: '♂', color: 'from-blue-500 to-blue-600' },
-            { value: 'femenino', label: 'Femenino', icon: '♀', color: 'from-pink-500 to-pink-600' }
-          ].map((g, index) => (
-            <motion.div
+            { value: 'todos', label: 'Todos', icon: '🏆' },
+            { value: 'masculino', label: 'Masculino', icon: '♂' },
+            { value: 'femenino', label: 'Femenino', icon: '♀' }
+          ].map((g) => (
+            <button
               key={g.value}
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: index * 0.1 }}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+              onClick={() => setFiltroGenero(g.value)}
+              className={`flex items-center gap-1 text-[10px] md:text-sm px-2 md:px-3 py-1 md:py-1.5 rounded-lg font-semibold transition-all ${
+                filtroGenero === g.value
+                  ? 'bg-primary text-white shadow-md'
+                  : 'border border-cardBorder text-textSecondary hover:border-primary/50 hover:text-textPrimary'
+              }`}
             >
-              <Button
-                variant={filtroGenero === g.value ? 'primary' : 'secondary'}
-                onClick={() => setFiltroGenero(g.value)}
-                className={`flex items-center gap-1 text-[10px] md:text-sm px-2 md:px-3 py-1 md:py-1.5 transition-all duration-300 ${
-                  filtroGenero === g.value 
-                    ? `bg-gradient-to-r ${g.color} text-white shadow-lg transform` 
-                    : 'hover:shadow-md'
-                }`}
-              >
-                <motion.span 
-                  className="text-xs md:text-base"
-                  animate={{ 
-                    scale: filtroGenero === g.value ? 1.2 : 1,
-                    rotate: filtroGenero === g.value ? [0, 10, -10, 0] : 0
-                  }}
-                  transition={{ duration: 0.3 }}
-                >
-                  {g.icon}
-                </motion.span>
-                <span className="hidden sm:inline">{g.label}</span>
-              </Button>
-            </motion.div>
+              <span className="text-xs md:text-base">{g.icon}</span>
+              <span className="hidden sm:inline">{g.label}</span>
+            </button>
           ))}
         </div>
       </div>
@@ -269,6 +253,13 @@ export default function Rankings() {
                   const partidosJugados = jugador.partidos_jugados || 0;
                   const partidosGanados = jugador.partidos_ganados || 0;
                   const porcentaje = partidosJugados > 0 ? Math.round((partidosGanados / partidosJugados) * 100) : 0;
+                  const posicion = indiceInicio + index;
+                  
+                  // Fondos especiales para TOP 3
+                  let bgClass = 'hover:bg-cardBorder';
+                  if (posicion === 0) bgClass = 'bg-gradient-to-r from-yellow-500/10 to-amber-500/10 hover:from-yellow-500/20 hover:to-amber-500/20';
+                  else if (posicion === 1) bgClass = 'bg-gradient-to-r from-gray-400/10 to-gray-500/10 hover:from-gray-400/20 hover:to-gray-500/20';
+                  else if (posicion === 2) bgClass = 'bg-gradient-to-r from-orange-400/10 to-orange-500/10 hover:from-orange-400/20 hover:to-orange-500/20';
                   
                   return (
                     <motion.tr
@@ -276,7 +267,7 @@ export default function Rankings() {
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: index * 0.02 }}
-                      className="border-b border-cardBorder hover:bg-cardBorder transition-colors"
+                      className={`border-b border-cardBorder ${bgClass} transition-all`}
                     >
                       <td className="py-2 md:py-4 px-2 md:px-4">
                         <div className="flex items-center gap-1 md:gap-2">
@@ -399,6 +390,13 @@ export default function Rankings() {
               const partidosJugados = jugador.partidos_jugados || 0;
               const partidosGanados = jugador.partidos_ganados || 0;
               const porcentaje = partidosJugados > 0 ? Math.round((partidosGanados / partidosJugados) * 100) : 0;
+              const posicion = indiceInicio + index;
+              
+              // Fondos especiales para TOP 3
+              let bgClass = 'bg-cardBg/50 border-cardBorder hover:border-primary/30';
+              if (posicion === 0) bgClass = 'bg-gradient-to-r from-yellow-500/10 to-amber-500/10 border-yellow-500/30 hover:border-yellow-500/50';
+              else if (posicion === 1) bgClass = 'bg-gradient-to-r from-gray-400/10 to-gray-500/10 border-gray-400/30 hover:border-gray-400/50';
+              else if (posicion === 2) bgClass = 'bg-gradient-to-r from-orange-400/10 to-orange-500/10 border-orange-400/30 hover:border-orange-400/50';
               
               return (
                 <motion.div
@@ -415,7 +413,7 @@ export default function Rankings() {
                     scale: 1.02,
                     boxShadow: "0 8px 25px rgba(0,0,0,0.15)"
                   }}
-                  className="bg-cardBg/50 rounded-lg p-2 border border-cardBorder hover:border-primary/30 transition-colors"
+                  className={`rounded-lg p-2 border ${bgClass} transition-all`}
                 >
                   <div className="flex items-center gap-2 mb-1.5">
                     {/* Posición y medalla */}

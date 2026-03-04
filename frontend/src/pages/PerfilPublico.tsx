@@ -41,6 +41,8 @@ export default function PerfilPublico() {
   const [estadisticas, setEstadisticas] = useState<EstadisticasJugador | null>(null);
   const [partidos, setPartidos] = useState<PartidoHistorial[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingEstadisticas, setLoadingEstadisticas] = useState(true);
+  const [loadingPartidos, setLoadingPartidos] = useState(true);
   const [error, setError] = useState('');
   const [filtro, setFiltro] = useState<'todos' | 'torneos' | 'amistosos'>('todos');
   const [mostrarTodos, setMostrarTodos] = useState(false);
@@ -119,6 +121,8 @@ export default function PerfilPublico() {
   const cargarPerfil = async (username: string) => {
     try {
       setLoading(true);
+      setLoadingEstadisticas(true);
+      setLoadingPartidos(true);
       setError('');
       
       clientLogger.userAction('View public profile', { username });
@@ -127,21 +131,34 @@ export default function PerfilPublico() {
       const perfilData = await perfilService.getPerfilPublico(username);
       console.log('Perfil data:', perfilData); // Debug
       setPerfil(perfilData);
+      setLoading(false); // Perfil cargado, mostrar UI
       
-      // Cargar estadísticas y partidos en paralelo (en segundo plano)
-      Promise.all([
-        perfilService.getEstadisticas(perfilData.id_usuario).catch(() => null),
-        perfilService.getHistorial(perfilData.id_usuario, 50).catch(() => [])
-      ]).then(([estadisticasData, partidosData]) => {
-        setEstadisticas(estadisticasData);
-        setPartidos(partidosData);
-      });
+      // Cargar estadísticas en segundo plano
+      perfilService.getEstadisticas(perfilData.id_usuario)
+        .then(estadisticasData => {
+          setEstadisticas(estadisticasData);
+          setLoadingEstadisticas(false);
+        })
+        .catch(() => {
+          setLoadingEstadisticas(false);
+        });
+      
+      // Cargar partidos en segundo plano
+      perfilService.getHistorial(perfilData.id_usuario, 50)
+        .then(partidosData => {
+          setPartidos(partidosData);
+          setLoadingPartidos(false);
+        })
+        .catch(() => {
+          setLoadingPartidos(false);
+        });
       
     } catch (err: any) {
       setError(err.message || 'Error al cargar el perfil');
       clientLogger.error('Error loading public profile', { username, error: err.message });
-    } finally {
       setLoading(false);
+      setLoadingEstadisticas(false);
+      setLoadingPartidos(false);
     }
   };
 
@@ -437,7 +454,26 @@ export default function PerfilPublico() {
             </motion.div>
 
             {/* Card de Estadísticas Avanzadas (si están disponibles) */}
-            {estadisticas && (
+            {loadingEstadisticas ? (
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.3 }}
+                className="bg-cardBg rounded-xl p-3 md:p-6 border border-cardBorder"
+              >
+                <div className="animate-pulse space-y-3">
+                  <div className="h-4 bg-cardBorder rounded w-3/4" />
+                  <div className="space-y-2">
+                    <div className="h-8 bg-cardBorder rounded" />
+                    <div className="h-8 bg-cardBorder rounded" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="h-16 bg-cardBorder rounded" />
+                    <div className="h-16 bg-cardBorder rounded" />
+                  </div>
+                </div>
+              </motion.div>
+            ) : estadisticas && (
               <motion.div
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -612,7 +648,13 @@ export default function PerfilPublico() {
 
               {/* Lista de Partidos */}
               <div className="space-y-3">
-                {partidosMostrados.length === 0 ? (
+                {loadingPartidos ? (
+                  <>
+                    <PartidoCardSkeleton />
+                    <PartidoCardSkeleton />
+                    <PartidoCardSkeleton />
+                  </>
+                ) : partidosMostrados.length === 0 ? (
                   <div className="text-center py-12">
                     <div className="bg-cardBorder/30 rounded-lg p-8">
                       <Trophy size={48} className="mx-auto mb-4 text-textSecondary opacity-50" />
