@@ -194,7 +194,19 @@ class TorneoService {
       categoria_id?: number;
       disponibilidad_horaria?: any[];
     }
-  ): Promise<{ pareja_id: number; codigo_confirmacion: string; fecha_expiracion: string; mensaje: string }> {
+  ): Promise<{ 
+    pareja_id: number; 
+    codigo_confirmacion: string; 
+    fecha_expiracion: string; 
+    mensaje: string;
+    // Propiedades opcionales de pago
+    requiere_pago?: boolean;
+    monto_inscripcion?: number;
+    alias_cbu_cvu?: string;
+    titular_cuenta?: string;
+    banco?: string;
+    telefono_contacto?: string;
+  }> {
     const response = await axios.post(
       `${API_URL}/torneos/${torneoId}/inscribir`,
       data,

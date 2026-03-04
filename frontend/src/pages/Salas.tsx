@@ -10,7 +10,7 @@ import MisSalasSection from '../components/salas/MisSalasSection';
 import SalasEnJuegoSection from '../components/salas/SalasEnJuegoSection';
 import ExplorarSalasTable from '../components/salas/ExplorarSalasTable';
 import { SalasDebug } from '../components/SalasDebug';
-import { Plus, Settings, AlertCircle, RefreshCw } from 'lucide-react';
+import { Plus, Settings, AlertCircle, RefreshCw, UserPlus } from 'lucide-react';
 import { useSalas } from '../context/SalasContext';
 import { useAuth } from '../context/AuthContext';
 import { Sala } from '../utils/types';
@@ -29,7 +29,6 @@ export default function Salas() {
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [historialColapsado, setHistorialColapsado] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
   // OPTIMIZACIÓN: Cargar salas con debounce
   const cargarSalasOptimizado = useCallback(async (forceRefresh: boolean = false) => {
@@ -37,7 +36,6 @@ export default function Salas() {
       try {
         setRefreshing(forceRefresh);
         await cargarSalas(forceRefresh);
-        setLastRefresh(new Date());
       } catch (error) {
         console.error('Error al cargar salas:', error);
       } finally {
@@ -60,7 +58,6 @@ export default function Salas() {
     // Cargar salas inicial
     if (usuario) {
       cargarSalas(false);
-      setLastRefresh(new Date());
     }
   }, [usuario, cargarSalas]);
 
@@ -75,7 +72,6 @@ export default function Salas() {
         // Configurar auto-refresh
         intervalId = setInterval(() => {
           cargarSalas(false);
-          setLastRefresh(new Date());
         }, 30000); // 30 segundos
       } else {
         // Limpiar interval cuando la página no es visible
@@ -92,7 +88,6 @@ export default function Salas() {
     if (document.visibilityState === 'visible') {
       intervalId = setInterval(() => {
         cargarSalas(false);
-        setLastRefresh(new Date());
       }, 30000);
     }
 
@@ -115,7 +110,7 @@ export default function Salas() {
     const mis = salas.filter(s => s.jugadores?.some(j => j.id === userId));
     const enJuego = salas.filter(s => 
       (s.estado === 'activa' || s.estado === 'en_juego') && 
-      !mis.some(m => m.id_sala === s.id_sala)
+      !mis.some(m => m.id === s.id)
     );
     
     return { misSalas: mis, salasEnJuego: enJuego };
@@ -143,13 +138,13 @@ export default function Salas() {
     });
     
     // Lógica mejorada basada en el estado real de la sala
-    if (sala.estado === 'finalizada' || sala.estado === 'terminada' || sala.estado === 'completada') {
+    if (sala.estado === 'finalizada') {
       // Sala finalizada - solo mostrar resultados
       setModalMarcadorOpen(true);
-    } else if (sala.estado === 'en_juego' || sala.estado === 'activa' || sala.estado === 'jugando') {
+    } else if (sala.estado === 'en_juego' || sala.estado === 'activa') {
       // Sala en juego - abrir marcador
       setModalMarcadorOpen(true);
-    } else if (sala.estado === 'esperando' || sala.estado === 'pendiente') {
+    } else if (sala.estado === 'esperando' || sala.estado === 'programada') {
       // Sala esperando - abrir sala de espera
       setModalEsperaOpen(true);
     } else {
@@ -166,101 +161,116 @@ export default function Salas() {
 
   return (
     <div className="w-full min-w-0 space-y-6">
-      {/* HEADER - Optimizado para móvil */}
+      {/* HEADER - Compacto y moderno */}
       <motion.div
         initial={{ opacity: 0, y: -30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="flex flex-col gap-4"
+        className="flex flex-col gap-3"
       >
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="h-1 w-8 md:w-12 bg-gradient-to-r from-primary to-secondary rounded-full" />
-            <h1 className="text-2xl md:text-4xl font-black text-textPrimary tracking-tight">
-              Salas
-            </h1>
-          </div>
-          <p className="text-textSecondary text-sm md:text-base ml-11 md:ml-15">Gestioná tus partidos de pádel</p>
-        </div>
-        
-        {/* Botones reorganizados para móvil */}
-        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-          <Button 
-            variant="primary" 
-            onClick={() => setModalCrearOpen(true)}
-            className="flex items-center justify-center gap-2 px-4 py-3 text-sm font-bold"
-          >
-            <Plus size={16} />
-            Nueva Sala
-          </Button>
-          
-          <div className="flex gap-2">
-            <div className="flex-1 sm:flex-none">
-              <input
-                type="text"
-                placeholder="🔍 Buscar"
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
-                className="w-full sm:w-48 bg-cardBg border border-cardBorder rounded-lg px-3 py-2.5 text-sm text-textPrimary placeholder-textSecondary focus:border-primary focus:outline-none"
-              />
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-3 mb-1">
+              <div className="h-1 w-8 md:w-12 bg-gradient-to-r from-primary to-secondary rounded-full" />
+              <h1 className="text-2xl md:text-4xl font-black text-textPrimary tracking-tight">
+                Salas
+              </h1>
             </div>
+            <p className="text-textSecondary text-sm ml-11 md:ml-15">Gestioná tus partidos de pádel</p>
+          </div>
+          
+          {/* Botones principales destacados */}
+          <div className="flex gap-2">
+            <Button 
+              variant="ghost" 
+              onClick={() => setModalUnirseOpen(true)}
+              className="flex items-center gap-2 px-4 md:px-6 py-3 text-sm md:text-base font-bold border-2 border-cardBorder hover:bg-primary/10 hover:border-primary transition-all"
+            >
+              <UserPlus size={18} />
+              <span className="hidden sm:inline">Unirse por código</span>
+              <span className="sm:hidden">Unirse</span>
+            </Button>
             
             <Button 
-              variant="secondary"
-              onClick={() => setMostrarFiltros(!mostrarFiltros)}
-              className="flex items-center gap-2 px-3 py-2.5 text-sm"
+              variant="primary" 
+              onClick={() => setModalCrearOpen(true)}
+              className="flex items-center gap-2 px-4 md:px-6 py-3 text-sm md:text-base font-bold shadow-lg shadow-primary/30 hover:shadow-xl hover:shadow-primary/40 transition-all"
             >
-              <Settings size={16} />
-              <span className="hidden sm:inline">Filtros</span>
-            </Button>
-
-            {/* OPTIMIZACIÓN: Botón de refresh */}
-            <Button 
-              variant="outline" 
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="flex items-center gap-2 px-3 py-2.5 text-sm"
-            >
-              <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
-              <span className="hidden sm:inline">{refreshing ? 'Actualizando...' : 'Actualizar'}</span>
+              <Plus size={20} />
+              <span className="hidden sm:inline">Nueva Sala</span>
+              <span className="sm:hidden">Crear</span>
             </Button>
           </div>
         </div>
+        
+        {/* Botones de acción - chips neutros */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex-1 min-w-[200px]">
+            <input
+              type="text"
+              placeholder="🔍 Buscar sala..."
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              className="w-full bg-cardBg border border-cardBorder rounded-lg px-3 py-2 text-sm text-textPrimary placeholder-textSecondary focus:border-primary focus:outline-none transition-colors"
+            />
+          </div>
 
-        {/* OPTIMIZACIÓN: Indicador de estado */}
-        <div className="flex items-center gap-2 text-xs text-textSecondary">
-          <div className={`w-2 h-2 rounded-full ${loading || refreshing ? 'bg-yellow-500 animate-pulse' : 'bg-green-500'}`} />
-          <span>
-            {loading || refreshing 
-              ? 'Actualizando salas...' 
-              : `Última actualización: ${lastRefresh.toLocaleTimeString()}`
-            }
-          </span>
+          <button
+            onClick={() => setMostrarFiltros(!mostrarFiltros)}
+            className={`flex items-center gap-2 px-3 py-2 text-sm rounded-lg border transition-all ${
+              mostrarFiltros 
+                ? 'bg-primary/10 border-primary text-primary' 
+                : 'bg-transparent border-cardBorder text-textSecondary hover:border-primary hover:text-primary'
+            }`}
+          >
+            <Settings size={16} />
+            <span>Filtros</span>
+          </button>
+
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg border border-cardBorder text-textSecondary hover:border-primary hover:text-primary transition-all disabled:opacity-50"
+          >
+            <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
+            <span>Actualizar</span>
+          </button>
+
+          {/* Stats inline compactas */}
+          <div className="hidden md:flex items-center gap-3 ml-auto text-xs text-textSecondary">
+            <span className="flex items-center gap-1.5">
+              <span className="font-bold text-textPrimary">{salas.length}</span> total
+            </span>
+            <span className="text-cardBorder">•</span>
+            <span className="flex items-center gap-1.5">
+              <span className="font-bold text-green-500">{salasActivas.length}</span> en juego
+            </span>
+            <span className="text-cardBorder">•</span>
+            <span className="flex items-center gap-1.5">
+              <span className="font-bold text-primary">{salasProgramadas.length}</span> programadas
+            </span>
+            <span className="text-cardBorder">•</span>
+            <span className="flex items-center gap-1.5">
+              <span className="font-bold text-textSecondary">{salasFinalizadas.length}</span> finalizadas
+            </span>
+          </div>
+        </div>
+
+        {/* Stats mobile - compactas */}
+        <div className="grid grid-cols-4 gap-2 md:hidden">
+          {[
+            { label: 'Total', value: salas.length },
+            { label: 'En juego', value: salasActivas.length },
+            { label: 'Programadas', value: salasProgramadas.length },
+            { label: 'Finalizadas', value: salasFinalizadas.length }
+          ].map((stat) => (
+            <div key={stat.label} className="text-center">
+              <p className="text-lg font-black text-textPrimary">{stat.value}</p>
+              <p className="text-[10px] text-textSecondary uppercase">{stat.label}</p>
+            </div>
+          ))}
         </div>
       </motion.div>
-
-      {/* KPIs - Optimizados para móvil */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
-        {[
-          { label: 'TOTAL', value: salas.length, color: 'from-cyan-500 to-blue-500' },
-          { label: 'EN JUEGO', value: salasActivas.length, color: 'from-green-500 to-emerald-500' },
-          { label: 'PROGRAMADAS', value: salasProgramadas.length, color: 'from-primary to-blue-500' },
-          { label: 'FINALIZADAS', value: salasFinalizadas.length, color: 'from-gray-500 to-gray-400' }
-        ].map((stat, index) => (
-          <motion.div
-            key={stat.label}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: index * 0.05 }}
-            className="bg-cardBg rounded-lg p-3 md:p-4 border border-cardBorder text-center"
-          >
-            <p className="text-xl md:text-2xl font-black text-textPrimary mb-1">{stat.value}</p>
-            <p className="text-textSecondary text-[10px] md:text-xs font-bold uppercase tracking-wider leading-tight">
-              {stat.label}
-            </p>
-          </motion.div>
-        ))}
-      </div>
 
       {/* Alerta de confirmaciones pendientes - Optimizada para móvil */}
       {salasPendientes.length > 0 && (
@@ -333,18 +343,33 @@ export default function Salas() {
         }}
         busqueda={busqueda}
         loading={loading}
+        onCrearSala={() => setModalCrearOpen(true)}
       />
 
-      {/* SECCIÓN 4 - HISTORIAL (COLAPSADO) */}
-      <div className="space-y-3">
+      {/* SECCIÓN 4 - HISTORIAL (ACORDEÓN VISIBLE) */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-cardBg rounded-xl border border-cardBorder overflow-hidden"
+      >
         <button
           onClick={() => setHistorialColapsado(!historialColapsado)}
-          className="flex items-center gap-2 text-textPrimary hover:text-primary transition-colors"
+          className="w-full flex items-center justify-between p-4 hover:bg-cardBorder/30 transition-colors group"
         >
-          <span className={`transform transition-transform ${historialColapsado ? 'rotate-0' : 'rotate-90'}`}>
-            ▸
+          <div className="flex items-center gap-3">
+            <span className={`transform transition-transform text-primary ${historialColapsado ? 'rotate-0' : 'rotate-90'}`}>
+              ▸
+            </span>
+            <span className="font-bold text-lg text-textPrimary group-hover:text-primary transition-colors">
+              Historial de Salas
+            </span>
+            <span className="px-2 py-0.5 bg-cardBorder rounded-full text-xs font-bold text-textSecondary">
+              {salasHistorial.length}
+            </span>
+          </div>
+          <span className="text-xs text-textSecondary">
+            {historialColapsado ? 'Mostrar' : 'Ocultar'}
           </span>
-          <span className="font-bold">Historial de Salas ({salasHistorial.length})</span>
         </button>
         
         {!historialColapsado && (
@@ -352,7 +377,7 @@ export default function Salas() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden"
+            className="border-t border-cardBorder"
           >
             <ExplorarSalasTable 
               salas={salasHistorial}
@@ -367,7 +392,7 @@ export default function Salas() {
             />
           </motion.div>
         )}
-      </div>
+      </motion.div>
 
       {/* Modales */}
       <ModalCrearSala isOpen={modalCrearOpen} onClose={() => setModalCrearOpen(false)} />

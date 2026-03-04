@@ -161,30 +161,30 @@ export default function ModalCrearSala({ isOpen, onClose, onSalaCreada }: ModalC
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+            <div className="grid grid-cols-2 gap-2 sm:gap-4">
               <div>
                 <label className="block text-textSecondary text-xs md:text-sm font-medium mb-2">
                   Fecha *
                 </label>
-                <Input
+                <input
                   type="date"
                   value={formData.fecha}
                   onChange={(e) => setFormData({ ...formData, fecha: e.target.value })}
                   min={new Date().toISOString().split('T')[0]}
                   disabled={creando}
-                  className="text-sm md:text-base"
+                  className="w-full px-2 py-2 text-xs md:text-base bg-background border border-cardBorder rounded-lg text-textPrimary focus:outline-none focus:border-primary transition-colors disabled:opacity-50"
                 />
               </div>
               <div>
                 <label className="block text-textSecondary text-xs md:text-sm font-medium mb-2">
                   Hora *
                 </label>
-                <Input
+                <input
                   type="time"
                   value={formData.hora}
                   onChange={(e) => setFormData({ ...formData, hora: e.target.value })}
                   disabled={creando}
-                  className="text-sm md:text-base"
+                  className="w-full px-2 py-2 text-xs md:text-base bg-background border border-cardBorder rounded-lg text-textPrimary focus:outline-none focus:border-primary transition-colors disabled:opacity-50"
                 />
               </div>
             </div>

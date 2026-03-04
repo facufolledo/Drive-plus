@@ -98,9 +98,9 @@ export default function MisSalasSection({ salas, onEntrarSala, onVerPartido, loa
         <Button
           variant="ghost"
           onClick={() => onVerPartido(sala.id)}
-          className="text-xs px-2 md:px-4 py-1.5 md:py-2"
+          className="w-full text-sm"
         >
-          Ver
+          Ver Resultado
         </Button>
       );
     }
@@ -111,10 +111,9 @@ export default function MisSalasSection({ salas, onEntrarSala, onVerPartido, loa
         <Button
           variant="secondary"
           onClick={() => onVerPartido(sala.id)}
-          className="text-xs px-2 md:px-4 py-1.5 md:py-2"
+          className="w-full text-sm"
         >
-          <span className="hidden sm:inline">Ver Partido</span>
-          <span className="sm:hidden">Ver</span>
+          Ver Partido
         </Button>
       );
     }
@@ -122,14 +121,14 @@ export default function MisSalasSection({ salas, onEntrarSala, onVerPartido, loa
     // Si la sala está esperando
     if (sala.estado === 'esperando') {
       // Si soy el organizador o ya estoy en la sala, mostrar "Entrar"
-      if (sala.es_organizador || salaOriginal?.jugadores?.some(j => j.id === usuario?.id_usuario?.toString())) {
+      if (sala.es_organizador || salaOriginal?.jugadores?.some((j: any) => j.id === usuario?.id_usuario?.toString())) {
         return (
           <Button
             variant="primary"
             onClick={() => onEntrarSala(sala.id)}
-            className="text-xs px-2 md:px-4 py-1.5 md:py-2"
+            className="w-full text-sm"
           >
-            Entrar
+            Entrar a la Sala
           </Button>
         );
       } else {
@@ -138,7 +137,7 @@ export default function MisSalasSection({ salas, onEntrarSala, onVerPartido, loa
           <Button
             variant="primary"
             onClick={() => onEntrarSala(sala.id)}
-            className="text-xs px-2 md:px-4 py-1.5 md:py-2"
+            className="w-full text-sm"
           >
             Unirse
           </Button>
@@ -151,7 +150,7 @@ export default function MisSalasSection({ salas, onEntrarSala, onVerPartido, loa
       <Button
         variant="ghost"
         onClick={() => onVerPartido(sala.id)}
-        className="text-xs px-2 md:px-4 py-1.5 md:py-2"
+        className="w-full text-sm"
       >
         Ver
       </Button>
@@ -198,175 +197,93 @@ export default function MisSalasSection({ salas, onEntrarSala, onVerPartido, loa
 
   return (
     <div className="mb-8">
-      {/* Header con info del usuario */}
+      {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
+        <h2 className="text-xl font-bold text-textPrimary flex items-center gap-2">
           <Crown size={20} className="text-primary" />
-          <div>
-            <h2 className="text-xl font-bold text-textPrimary">
-              Mis Salas ({misSalasFormateadas.length})
-            </h2>
-            <p className="text-textSecondary text-sm">
-              {usuario?.nombre} {usuario?.apellido} • Rating: {usuario?.rating || 1000}
-            </p>
-          </div>
-        </div>
+          Mis Salas ({misSalasFormateadas.length})
+        </h2>
         
         {misSalasFormateadas.length > 3 && (
-          <Button
-            variant="ghost"
+          <button
             onClick={() => setExpandido(!expandido)}
-            className="flex items-center gap-2 text-sm"
+            className="flex items-center gap-2 text-sm text-textSecondary hover:text-primary transition-colors"
           >
-            {expandido ? 'Contraer' : `Expandir (${misSalasFormateadas.length - 3} más)`}
+            {expandido ? 'Ver menos' : `Ver todas (${misSalasFormateadas.length})`}
             <ChevronDown 
               size={16} 
               className={`transform transition-transform ${expandido ? 'rotate-180' : ''}`} 
             />
-          </Button>
+          </button>
         )}
       </div>
       
-      {/* Lista de salas estilo tabla compacta */}
-      <div className="bg-cardBg border border-cardBorder rounded-lg overflow-hidden">
-        {/* Header de la tabla - Oculto en móvil */}
-        <div className="bg-cardBorder/20 px-3 md:px-4 py-2 md:py-3 border-b border-cardBorder hidden md:block">
-          <div className="grid grid-cols-12 gap-2 md:gap-4 text-xs font-bold text-textSecondary uppercase tracking-wider">
-            <div className="col-span-4">Sala</div>
-            <div className="col-span-2">Jugadores</div>
-            <div className="col-span-2">Estado</div>
-            <div className="col-span-2">Fecha</div>
-            <div className="col-span-2 text-right">Acción</div>
-          </div>
-        </div>
-
-        {/* Filas de salas */}
-        <div className="divide-y divide-cardBorder">
-          {salasVisibles.map((sala, index) => (
-            <motion.div
-              key={sala.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-              className="px-3 md:px-4 py-3 hover:bg-cardBorder/10 transition-colors"
-            >
-              {/* Layout móvil */}
-              <div className="block md:hidden">
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-textPrimary text-sm truncate">{sala.nombre}</p>
-                    {/* Debug info - remover en producción */}
-                    <p className="text-[8px] text-gray-400">Estado: {salas.find(s => parseInt(s.id) === sala.id)?.estado}</p>
-                    {sala.es_organizador && (
-                      <div className="flex items-center gap-1 mt-1">
-                        <Crown size={10} className="text-yellow-400" />
-                        <span className="text-[10px] text-yellow-400">Organizador</span>
-                      </div>
-                    )}
+      {/* Grid de cards visuales */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        {salasVisibles.map((sala, index) => (
+          <motion.div
+            key={sala.id}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: index * 0.05 }}
+            className={`bg-cardBg border rounded-xl p-4 hover:shadow-lg transition-all ${
+              sala.estado === 'en_juego' 
+                ? 'border-green-500/50 shadow-green-500/20' 
+                : sala.estado === 'esperando'
+                ? 'border-yellow-500/50'
+                : 'border-cardBorder'
+            }`}
+          >
+            {/* Header de la card */}
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex-1 min-w-0">
+                <h3 className="font-bold text-textPrimary text-base truncate mb-1">
+                  {sala.nombre}
+                </h3>
+                {sala.es_organizador && (
+                  <div className="flex items-center gap-1">
+                    <Crown size={12} className="text-yellow-400" />
+                    <span className="text-xs text-yellow-400">Organizador</span>
                   </div>
-                  <div className="ml-2 flex-shrink-0">
-                    {getAccionButton(sala)}
-                  </div>
-                </div>
-                
-                <div className="flex items-center justify-between text-xs text-textSecondary">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1">
-                      <Users size={12} />
-                      <span>{sala.jugadores_actuales}/{sala.jugadores_maximos}</span>
-                    </div>
-                    
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getEstadoColor(sala.estado)}`}>
-                      ● {getEstadoTexto(sala.estado)}
-                    </span>
-                  </div>
-                  
-                  <div className="text-right">
-                    {sala.estado === 'esperando' && (
-                      <div className="flex items-center gap-1">
-                        <Calendar size={10} />
-                        <span className="text-[10px]">{sala.fecha}</span>
-                      </div>
-                    )}
-                    {sala.estado === 'en_juego' && sala.tiempo_transcurrido && (
-                      <div className="flex items-center gap-1">
-                        <Clock size={10} />
-                        <span className="text-[10px]">{sala.tiempo_transcurrido}</span>
-                      </div>
-                    )}
-                    {sala.estado === 'finalizada' && (
-                      <span className="text-[10px]">{sala.fecha}</span>
-                    )}
-                  </div>
-                </div>
+                )}
               </div>
+              <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${getEstadoColor(sala.estado)} flex-shrink-0 ml-2`}>
+                {sala.estado === 'en_juego' && '● '}
+                {getEstadoTexto(sala.estado)}
+              </span>
+            </div>
 
-              {/* Layout desktop */}
-              <div className="hidden md:grid grid-cols-12 gap-4 items-center">
-                {/* Nombre de la sala */}
-                <div className="col-span-4 flex items-center gap-2">
-                  <div>
-                    <p className="font-bold text-textPrimary text-sm">{sala.nombre}</p>
-                    {/* Debug info - remover en producción */}
-                    <p className="text-[8px] text-gray-400">Estado original: {salas.find(s => parseInt(s.id) === sala.id)?.estado}</p>
-                    {sala.es_organizador && (
-                      <div className="flex items-center gap-1 mt-1">
-                        <Crown size={12} className="text-yellow-400" />
-                        <span className="text-xs text-yellow-400">Organizador</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Jugadores */}
-                <div className="col-span-2">
-                  <div className="flex items-center gap-1 text-sm text-textSecondary">
-                    <Users size={14} />
-                    <span>{sala.jugadores_actuales} / {sala.jugadores_maximos}</span>
-                  </div>
-                </div>
-
-                {/* Estado */}
-                <div className="col-span-2">
-                  <div className="flex items-center gap-2">
-                    <span className={`px-2 py-1 rounded-full text-xs font-bold ${getEstadoColor(sala.estado)}`}>
-                      ● {getEstadoTexto(sala.estado)}
-                    </span>
-                    {sala.estado === 'en_juego' && (
-                      <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Fecha */}
-                <div className="col-span-2">
-                  <div className="text-sm text-textSecondary">
-                    {sala.estado === 'esperando' && (
-                      <div className="flex items-center gap-1">
-                        <Calendar size={12} />
-                        <span>{sala.fecha} {sala.hora}</span>
-                      </div>
-                    )}
-                    {sala.estado === 'en_juego' && sala.tiempo_transcurrido && (
-                      <div className="flex items-center gap-1">
-                        <Clock size={12} />
-                        <span>{sala.tiempo_transcurrido}</span>
-                      </div>
-                    )}
-                    {sala.estado === 'finalizada' && (
-                      <span>{sala.fecha}</span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Acción */}
-                <div className="col-span-2 text-right">
-                  {getAccionButton(sala)}
-                </div>
+            {/* Info de la sala */}
+            <div className="space-y-2 mb-4">
+              <div className="flex items-center gap-2 text-sm text-textSecondary">
+                <Users size={14} />
+                <span className="font-medium text-textPrimary">
+                  {sala.jugadores_actuales}/{sala.jugadores_maximos}
+                </span>
+                <span>jugadores</span>
               </div>
-            </motion.div>
-          ))}
-        </div>
+              
+              <div className="flex items-center gap-2 text-sm text-textSecondary">
+                {sala.estado === 'en_juego' && sala.tiempo_transcurrido ? (
+                  <>
+                    <Clock size={14} />
+                    <span>{sala.tiempo_transcurrido}</span>
+                  </>
+                ) : (
+                  <>
+                    <Calendar size={14} />
+                    <span>{sala.fecha}</span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Botón de acción */}
+            <div className="pt-3 border-t border-cardBorder">
+              {getAccionButton(sala)}
+            </div>
+          </motion.div>
+        ))}
       </div>
     </div>
   );

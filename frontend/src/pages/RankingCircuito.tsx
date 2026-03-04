@@ -257,12 +257,16 @@ export default function RankingCircuito() {
             </button>
           )}
 
-          {/* Banner del circuito */}
+          {/* Banner del circuito mejorado */}
           {circuitoInfo && (
-            <div className={`relative rounded-xl overflow-hidden bg-gradient-to-r ${CARD_GRADIENTS[Math.abs(codigoParam.charCodeAt(0)) % CARD_GRADIENTS.length]}`}>
+            <div className={`relative rounded-xl overflow-hidden bg-gradient-to-br ${CARD_GRADIENTS[Math.abs(codigoParam.charCodeAt(0)) % CARD_GRADIENTS.length]}`}>
+              {/* Patrón de fondo sutil */}
+              <div className="absolute inset-0 opacity-10">
+                <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '40px 40px' }} />
+              </div>
               {circuitoInfo.logo_url && (
                 <div className="absolute inset-0">
-                  <img src={circuitoInfo.logo_url} alt="" className="w-full h-full object-cover opacity-20" />
+                  <img src={circuitoInfo.logo_url} alt="" className="w-full h-full object-cover opacity-20 blur-sm" />
                 </div>
               )}
               {/* Admin: botón editar imagen del banner */}
@@ -276,21 +280,24 @@ export default function RankingCircuito() {
                 </button>
               )}
               <div className="relative p-4 md:p-6">
-                <div className="flex items-center justify-between">
+                <div className="space-y-3">
                   <div>
-                    <h1 className="text-2xl md:text-4xl font-black text-white">{circuitoInfo.nombre}</h1>
+                    <h1 className="text-2xl md:text-4xl font-black text-white drop-shadow-lg">{circuitoInfo.nombre}</h1>
                     {circuitoInfo.descripcion && (
-                      <p className="text-white/70 text-sm mt-1">{circuitoInfo.descripcion}</p>
+                      <p className="text-white/80 text-sm mt-1">Circuito 2026</p>
                     )}
                   </div>
-                  <div className="flex gap-3">
-                    <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2 text-center">
-                      <p className="text-white font-black text-xl">{circuitoInfo.torneos?.length || 0}</p>
-                      <p className="text-white/60 text-[10px]">Torneos</p>
+                  {/* Stats del circuito */}
+                  <div className="flex items-center gap-3 md:gap-4 flex-wrap">
+                    <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-sm rounded-lg px-3 py-1.5">
+                      <Trophy className="text-white/80" size={16} />
+                      <span className="text-white font-bold text-sm">{circuitoInfo.torneos?.length || 0}</span>
+                      <span className="text-white/70 text-xs">torneos</span>
                     </div>
-                    <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2 text-center">
-                      <p className="text-white font-black text-xl">{ranking.length}</p>
-                      <p className="text-white/60 text-[10px]">Jugadores</p>
+                    <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-sm rounded-lg px-3 py-1.5">
+                      <span className="text-white/80 text-lg">👥</span>
+                      <span className="text-white font-bold text-sm">{ranking.length}</span>
+                      <span className="text-white/70 text-xs">jugadores</span>
                     </div>
                   </div>
                 </div>
@@ -298,6 +305,17 @@ export default function RankingCircuito() {
             </div>
           )}
         </motion.div>
+
+        {/* Texto explicativo del ranking */}
+        <Card>
+          <div className="flex items-center gap-2">
+            <Trophy className="text-primary flex-shrink-0" size={18} />
+            <div>
+              <h3 className="text-textPrimary font-bold text-sm">Ranking del Circuito</h3>
+              <p className="text-textSecondary text-xs">Puntos obtenidos en torneos del circuito {circuitoInfo?.nombre || ''}</p>
+            </div>
+          </div>
+        </Card>
 
         {/* Filtros */}
         <div className="space-y-3">
@@ -311,9 +329,17 @@ export default function RankingCircuito() {
               <span className="text-xs md:text-sm font-bold">Categoría:</span>
             </div>
             {['Todas', ...getCategoriasNombres()].map(cat => (
-              <Button key={cat} variant={filtroCategoria === cat ? 'primary' : 'secondary'} onClick={() => setFiltroCategoria(cat)} className="text-[10px] md:text-sm px-2 md:px-3 py-1 md:py-1.5">
+              <button
+                key={cat}
+                onClick={() => setFiltroCategoria(cat)}
+                className={`text-[10px] md:text-sm px-2 md:px-3 py-1 md:py-1.5 rounded-lg font-semibold transition-all ${
+                  filtroCategoria === cat
+                    ? 'bg-primary text-white shadow-md'
+                    : 'border border-cardBorder text-textSecondary hover:border-primary/50 hover:text-textPrimary'
+                }`}
+              >
                 {cat}
-              </Button>
+              </button>
             ))}
           </div>
         </div>
@@ -348,8 +374,15 @@ export default function RankingCircuito() {
                 ) : (
                   rankingFiltrado.map((j, index) => {
                     const nombreCompleto = `${j.nombre || ''} ${j.apellido || ''}`.trim() || j.nombre_usuario || 'Sin nombre';
+                    
+                    // Fondos especiales para TOP 3
+                    let bgClass = 'hover:bg-cardBorder/50';
+                    if (index === 0) bgClass = 'bg-gradient-to-r from-yellow-500/10 to-amber-500/10 hover:from-yellow-500/20 hover:to-amber-500/20';
+                    else if (index === 1) bgClass = 'bg-gradient-to-r from-gray-400/10 to-gray-500/10 hover:from-gray-400/20 hover:to-gray-500/20';
+                    else if (index === 2) bgClass = 'bg-gradient-to-r from-orange-400/10 to-orange-500/10 hover:from-orange-400/20 hover:to-orange-500/20';
+                    
                     return (
-                      <motion.tr key={`${j.id_usuario}-${j.categoria}`} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: index * 0.02 }} className="border-b border-cardBorder hover:bg-cardBorder/50 transition-colors">
+                      <motion.tr key={`${j.id_usuario}-${j.categoria}`} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: index * 0.02 }} className={`border-b border-cardBorder ${bgClass} transition-all`}>
                         <td className="py-4 px-4">
                           <div className="flex items-center gap-2">
                             {index === 0 && <Medal className="text-accent" size={16} />}
@@ -370,7 +403,7 @@ export default function RankingCircuito() {
                             <p className="text-textSecondary text-xs">@{j.nombre_usuario || 'sin-usuario'}</p>
                           </button>
                         </td>
-                        <td className="py-4 px-4 text-center"><span className="text-2xl font-black text-accent">{j.puntos}</span></td>
+                        <td className="py-4 px-4 text-center"><span className="text-2xl font-black text-primary">{j.puntos}</span></td>
                         <td className="py-4 px-4 text-center">
                           <span className="inline-block px-3 py-1 rounded-full text-white font-bold text-sm bg-gradient-to-r from-blue-500 to-blue-600">{j.categoria || '-'}</span>
                         </td>
@@ -400,6 +433,13 @@ export default function RankingCircuito() {
             ) : (
               rankingFiltrado.map((j, index) => {
                 const nombreCompleto = `${j.nombre || ''} ${j.apellido || ''}`.trim() || j.nombre_usuario || 'Sin nombre';
+                
+                // Fondos especiales para TOP 3
+                let bgClass = 'bg-cardBg/50 border-cardBorder hover:border-primary/30';
+                if (index === 0) bgClass = 'bg-gradient-to-r from-yellow-500/10 to-amber-500/10 border-yellow-500/30 hover:border-yellow-500/50';
+                else if (index === 1) bgClass = 'bg-gradient-to-r from-gray-400/10 to-gray-500/10 border-gray-400/30 hover:border-gray-400/50';
+                else if (index === 2) bgClass = 'bg-gradient-to-r from-orange-400/10 to-orange-500/10 border-orange-400/30 hover:border-orange-400/50';
+                
                 return (
                   <motion.div key={`${j.id_usuario}-${j.categoria}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.04 }}
                     onClick={() => {
@@ -409,7 +449,7 @@ export default function RankingCircuito() {
                         j.nombre_usuario ? navigate(`/jugador/${j.nombre_usuario}`) : navigate(`/perfil/${j.id_usuario}`);
                       }
                     }}
-                    className="bg-cardBg/50 rounded-lg p-2 border border-cardBorder hover:border-primary/30 transition-colors cursor-pointer">
+                    className={`rounded-lg p-2 border ${bgClass} transition-all cursor-pointer`}>
                     <div className="flex items-center gap-2 mb-1.5">
                       <div className="flex items-center gap-1 flex-shrink-0">
                         {index === 0 && <Medal className="text-accent" size={14} />}
@@ -422,7 +462,7 @@ export default function RankingCircuito() {
                         <p className="text-textSecondary text-[9px] truncate">@{j.nombre_usuario}</p>
                       </div>
                       <div className="text-right flex-shrink-0">
-                        <p className="text-xl font-black text-accent">{j.puntos}</p>
+                        <p className="text-xl font-black text-primary">{j.puntos}</p>
                         <span className="inline-block px-1.5 py-0.5 rounded-full text-white font-bold text-[8px] bg-gradient-to-r from-blue-500 to-blue-600">{j.categoria || '-'}</span>
                       </div>
                     </div>

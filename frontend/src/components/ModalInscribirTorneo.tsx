@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Users, AlertCircle, Search, Loader2 } from 'lucide-react';
+import { X, Users, AlertCircle, Search, Loader2, Clock } from 'lucide-react';
 import Button from './Button';
 import { useTorneos } from '../context/TorneosContext';
 import { useAuth } from '../context/AuthContext';
@@ -54,6 +54,7 @@ export default function ModalInscribirTorneo({
   
   // Disponibilidad horaria
   const [disponibilidadHoraria, setDisponibilidadHoraria] = useState<FranjaHoraria[]>([]);
+  const [sinRestricciones, setSinRestricciones] = useState(false);
   
   // Categorías del torneo
   const [categorias, setCategorias] = useState<Categoria[]>([]);
@@ -239,6 +240,12 @@ export default function ModalInscribirTorneo({
       return;
     }
 
+    // Validar disponibilidad horaria
+    if (!sinRestricciones && disponibilidadHoraria.length === 0) {
+      setError('Debes indicar tu disponibilidad horaria o marcar que estás disponible a cualquier hora');
+      return;
+    }
+
     try {
       console.log('🔍 DEBUG - INSCRIPCIÓN FRONTEND');
       console.log('Disponibilidad horaria:', disponibilidadHoraria);
@@ -251,7 +258,7 @@ export default function ModalInscribirTorneo({
         jugador2_id: jugador2.id_usuario,
         nombre_pareja: nombrePareja,
         categoria_id: categoriaSeleccionada || undefined,
-        disponibilidad_horaria: disponibilidadHoraria.length > 0 ? disponibilidadHoraria : undefined,
+        disponibilidad_horaria: sinRestricciones ? undefined : (disponibilidadHoraria.length > 0 ? disponibilidadHoraria : undefined),
       };
       
       console.log('📤 Datos a enviar:', dataToSend);
@@ -624,16 +631,61 @@ export default function ModalInscribirTorneo({
                       </div>
                     )}
 
-                    {/* Selector de disponibilidad horaria */}
+                    {/* Selector de disponibilidad horaria - DESTACADO */}
                     {selectedCompanero && (esOrganizador ? selectedJugador1 : usuario) && (
-                      <div className="bg-cardHover rounded-lg p-3 sm:p-4">
-                        <SelectorDisponibilidad
-                          value={disponibilidadHoraria}
-                          onChange={setDisponibilidadHoraria}
-                          fechaInicio={fechaInicio || torneoData?.fecha_inicio || ''}
-                          fechaFin={fechaFin || torneoData?.fecha_fin || ''}
-                          horariosDisponibles={torneoData?.horarios_disponibles}
-                        />
+                      <div className="bg-accent/10 border-2 border-accent/30 rounded-lg sm:rounded-xl p-3 sm:p-4">
+                        <div className="flex items-center gap-2 mb-2 sm:mb-3">
+                          <Clock size={16} className="text-accent flex-shrink-0 sm:w-5 sm:h-5" />
+                          <h3 className="font-bold text-accent text-sm sm:text-base">⚠ Importante: Disponibilidad Horaria</h3>
+                        </div>
+                        <p className="text-xs text-textSecondary mb-3">
+                          Indicá cuándo podés jugar para que el fixture se arme mejor
+                        </p>
+                        
+                        {/* Checkbox sin restricciones */}
+                        <div className="mb-3 p-3 bg-background rounded-lg border border-cardBorder">
+                          <label className="flex items-start gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={sinRestricciones}
+                              onChange={(e) => {
+                                setSinRestricciones(e.target.checked);
+                                if (e.target.checked) {
+                                  setDisponibilidadHoraria([]);
+                                }
+                              }}
+                              className="mt-0.5 w-4 h-4 text-primary bg-background border-cardBorder rounded focus:ring-primary focus:ring-2"
+                            />
+                            <div className="flex-1">
+                              <span className="text-sm font-medium text-textPrimary">
+                                ✓ Estoy disponible a cualquier hora
+                              </span>
+                              <p className="text-xs text-textSecondary mt-1">
+                                Marcá esto si no tenés restricciones de horario
+                              </p>
+                            </div>
+                          </label>
+                        </div>
+
+                        {/* Selector de franjas horarias */}
+                        {!sinRestricciones && (
+                          <SelectorDisponibilidad
+                            value={disponibilidadHoraria}
+                            onChange={setDisponibilidadHoraria}
+                            fechaInicio={fechaInicio || torneoData?.fecha_inicio || ''}
+                            fechaFin={fechaFin || torneoData?.fecha_fin || ''}
+                            horariosDisponibles={torneoData?.horarios_disponibles}
+                          />
+                        )}
+
+                        {/* Validación visual */}
+                        {!sinRestricciones && disponibilidadHoraria.length === 0 && (
+                          <div className="mt-2 p-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                            <p className="text-xs text-yellow-600 dark:text-yellow-500">
+                              ⚠ Agregá al menos una franja horaria o marcá que estás disponible siempre
+                            </p>
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -649,32 +701,34 @@ export default function ModalInscribirTorneo({
                       </motion.div>
                     )}
 
-                    {/* Botones */}
-                    <div className="flex gap-2 sm:gap-3 pt-2 sm:pt-4">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={handleClose}
-                        disabled={loading}
-                        className="flex-1 text-xs sm:text-sm py-2 sm:py-2.5"
-                      >
-                        Cancelar
-                      </Button>
-                      <Button
-                        type="submit"
-                        variant="accent"
-                        disabled={loading}
-                        className="flex-1 text-xs sm:text-sm py-2 sm:py-2.5 flex items-center justify-center gap-2"
-                      >
-                        {loading ? (
-                          <>
-                            <Loader2 size={14} className="animate-spin" />
-                            Inscribiendo...
-                          </>
-                        ) : (
-                          'Inscribir Pareja'
-                        )}
-                      </Button>
+                    {/* Botones - Sticky en mobile */}
+                    <div className="sticky bottom-0 left-0 right-0 bg-cardBg border-t border-cardBorder -mx-3 -mb-3 px-3 py-3 sm:relative sm:border-t-0 sm:mx-0 sm:mb-0 sm:px-0 sm:pt-4">
+                      <div className="flex gap-2 sm:gap-3">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={handleClose}
+                          disabled={loading}
+                          className="flex-1 text-xs sm:text-sm py-2 sm:py-2.5"
+                        >
+                          Cancelar
+                        </Button>
+                        <Button
+                          type="submit"
+                          variant="accent"
+                          disabled={loading}
+                          className="flex-1 text-xs sm:text-sm py-2 sm:py-2.5 flex items-center justify-center gap-2"
+                        >
+                          {loading ? (
+                            <>
+                              <Loader2 size={14} className="animate-spin" />
+                              Inscribiendo...
+                            </>
+                          ) : (
+                            'Inscribir Pareja'
+                          )}
+                        </Button>
+                      </div>
                     </div>
                   </form>
                 </>

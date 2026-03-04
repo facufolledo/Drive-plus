@@ -20,6 +20,7 @@ interface ExplorarSalasTableProps {
   busqueda: string;
   loading?: boolean;
   soloLectura?: boolean;
+  onCrearSala?: () => void;
 }
 
 export default function ExplorarSalasTable({ 
@@ -28,7 +29,8 @@ export default function ExplorarSalasTable({
   onVerSala, 
   busqueda, 
   loading, 
-  soloLectura = false 
+  soloLectura = false,
+  onCrearSala
 }: ExplorarSalasTableProps) {
   const [paginaActual, setPaginaActual] = useState(1);
   const ITEMS_POR_PAGINA = 10;
@@ -148,11 +150,22 @@ export default function ExplorarSalasTable({
           <p className="text-textSecondary text-sm mb-2">
             {busqueda ? `No se encontraron salas con "${busqueda}"` : 'No hay salas disponibles'}
           </p>
-          {busqueda && (
+          {busqueda ? (
             <p className="text-textSecondary text-xs">
               Intenta con otros términos de búsqueda
             </p>
-          )}
+          ) : !soloLectura && onCrearSala ? (
+            <div className="mt-4">
+              <Button
+                variant="primary"
+                onClick={onCrearSala}
+                className="flex items-center gap-2 mx-auto"
+              >
+                <UserPlus size={16} />
+                Crear una sala
+              </Button>
+            </div>
+          ) : null}
         </div>
       ) : (
         <div className="bg-cardBg border border-cardBorder rounded-lg overflow-hidden">
