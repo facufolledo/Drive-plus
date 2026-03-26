@@ -228,11 +228,7 @@ async def ranking_circuito(
             COALESCE(tc.nombre, cpj.categoria_nombre) as categoria,
             SUM(cpj.puntos) as total_puntos,
             COUNT(DISTINCT COALESCE(cpj.torneo_externo, CAST(cpj.torneo_id AS TEXT))) as torneos_jugados,
-            (SELECT cpj2.fase_alcanzada FROM circuito_puntos_jugador cpj2 
-             WHERE cpj2.usuario_id = cpj.usuario_id 
-             AND COALESCE(cpj2.categoria_nombre, (SELECT c.nombre FROM categorias c JOIN torneo_categorias tc2 ON c.id_categoria = cpj2.categoria_id WHERE tc2.id = cpj2.categoria_id)) = COALESCE(tc.nombre, cpj.categoria_nombre)
-             AND cpj2.circuito_id = :cid
-             ORDER BY cpj2.puntos DESC LIMIT 1) as mejor_fase
+            MAX(cpj.fase_alcanzada) as mejor_fase
         FROM circuito_puntos_jugador cpj
         JOIN usuarios u ON cpj.usuario_id = u.id_usuario
         LEFT JOIN perfil_usuarios p ON u.id_usuario = p.id_usuario
