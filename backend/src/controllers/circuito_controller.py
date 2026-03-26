@@ -203,7 +203,7 @@ async def ranking_circuito(
 ):
     """
     Ranking de jugadores en un circuito.
-    Una sola query SQL: suma puntos, cuenta torneos, y obtiene mejor fase.
+    Una sola query SQL: suma puntos, cuenta torneos (incluyendo externos), y obtiene mejor fase.
     """
     from sqlalchemy import text
     codigo = codigo.lower()
@@ -215,7 +215,7 @@ async def ranking_circuito(
     params = {"cid": circuito.id, "lim": limit}
     cat_filter = ""
     if categoria:
-        cat_filter = "AND tc.nombre = :cat"
+        cat_filter = "AND (tc.nombre = :cat OR cpj.categoria_nombre = :cat)"
         params["cat"] = categoria
     
     sql = f"""
@@ -225,12 +225,12 @@ async def ranking_circuito(
             p.nombre,
             p.apellido,
             p.url_avatar,
-            tc.nombre as categoria,
+            COALESCE(tc.nombre, cpj.categoria_nombre) as categoria,
             SUM(cpj.puntos) as total_puntos,
-            COUNT(DISTINCT cpj.torneo_id) as torneos_jugados,
+            COUNT(DISTINCT COALESCE(cpj.torneo_externo, CAST(cpj.torneo_id AS TEXT))) as torneos_jugados,
             (SELECT cpj2.fase_alcanzada FROM circuito_puntos_jugador cpj2 
              WHERE cpj2.usuario_id = cpj.usuario_id 
-             AND cpj2.categoria_id = cpj.categoria_id 
+             AND COALESCE(cpj2.categoria_nombre, (SELECT c.nombre FROM categorias c JOIN torneo_categorias tc2 ON c.id_categoria = tc2.categoria_id WHERE tc2.id = cpj2.categoria_id)) = COALESCE(tc.nombre, cpj.categoria_nombre)
              AND cpj2.circuito_id = :cid
              ORDER BY cpj2.puntos DESC LIMIT 1) as mejor_fase
         FROM circuito_puntos_jugador cpj
@@ -238,7 +238,7 @@ async def ranking_circuito(
         LEFT JOIN perfil_usuarios p ON u.id_usuario = p.id_usuario
         LEFT JOIN torneo_categorias tc ON cpj.categoria_id = tc.id
         WHERE cpj.circuito_id = :cid {cat_filter}
-        GROUP BY cpj.usuario_id, cpj.categoria_id, u.nombre_usuario, p.nombre, p.apellido, p.url_avatar, tc.nombre
+        GROUP BY cpj.usuario_id, u.nombre_usuario, p.nombre, p.apellido, p.url_avatar, COALESCE(tc.nombre, cpj.categoria_nombre)
         HAVING SUM(cpj.puntos) > 0
         ORDER BY total_puntos DESC
         LIMIT :lim
