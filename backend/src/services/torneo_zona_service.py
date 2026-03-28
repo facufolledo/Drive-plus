@@ -363,11 +363,11 @@ class TorneoZonaService:
                     'puntos': 0
                 })
         
-        # Obtener partidos de la zona (confirmados = finalizados)
+        # Obtener partidos de la zona (confirmados o finalizados)
         partidos = db.query(Partido).filter(
             Partido.id_torneo == zona.torneo_id,
             Partido.zona_id == zona_id,
-            Partido.estado == 'confirmado'
+            Partido.estado.in_(['confirmado', 'finalizado'])
         ).all()
         
         # Calcular estadísticas
