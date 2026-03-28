@@ -1505,11 +1505,11 @@ def listar_zonas_con_tablas(
         parejas = db.query(TorneoPareja).filter(TorneoPareja.id.in_(parejas_ids)).all() if parejas_ids else []
         parejas_dict = {p.id: p for p in parejas}
 
-        # 4. Cargar TODOS los partidos confirmados de estas zonas en una sola query
+        # 4. Cargar TODOS los partidos confirmados o finalizados de estas zonas en una sola query
         partidos = db.query(Partido).filter(
             Partido.id_torneo == torneo_id,
             Partido.zona_id.in_(zonas_ids),
-            Partido.estado == 'confirmado'
+            Partido.estado.in_(['confirmado', 'finalizado'])
         ).all()
         
         # Agrupar partidos por zona

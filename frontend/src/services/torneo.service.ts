@@ -437,7 +437,9 @@ class TorneoService {
     if (!torneoId || isNaN(torneoId) || torneoId <= 0) {
       return { zonas: [], tablas: [] };
     }
-    const params = categoriaId != null ? { categoria_id: categoriaId } : {};
+    const params: any = categoriaId != null ? { categoria_id: categoriaId } : {};
+    // Agregar timestamp para evitar cache del navegador
+    params._t = Date.now();
     const response = await axios.get(`${API_URL}/torneos/${torneoId}/zonas/tablas`, { params });
     return response.data;
   }
