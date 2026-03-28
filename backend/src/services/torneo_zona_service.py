@@ -364,6 +364,7 @@ class TorneoZonaService:
                 })
         
         # Obtener partidos de la zona (confirmados o finalizados)
+        # IMPORTANTE: Incluir 'finalizado' para calcular puntos correctamente
         partidos = db.query(Partido).filter(
             Partido.id_torneo == zona.torneo_id,
             Partido.zona_id == zona_id,
