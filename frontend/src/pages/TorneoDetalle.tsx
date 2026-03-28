@@ -51,7 +51,12 @@ export default function TorneoDetalle() {
   // Escuchar evento para cambiar tab
   useEffect(() => {
     const handleCambiarTab = (event: any) => {
-      setTab(event.detail);
+      const detail = event.detail;
+      // Soporta ambos formatos:
+      // - detail: "partidos"
+      // - detail: { tab: "partidos", categoriaId, zonaId }
+      const tabTarget = typeof detail === 'string' ? detail : detail?.tab;
+      if (tabTarget) setTab(tabTarget);
     };
     window.addEventListener('cambiarTab', handleCambiarTab);
     return () => window.removeEventListener('cambiarTab', handleCambiarTab);

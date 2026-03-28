@@ -1,0 +1,38 @@
+#!/usr/bin/env python3
+"""
+Fix solapamiento: mover partido 762 al viernes 23:00
+"""
+import sys, os
+sys.path.insert(0, os.path.dirname(__file__))
+from dotenv import load_dotenv
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
+from datetime import datetime
+
+load_dotenv()
+engine = create_engine(os.getenv("DATABASE_URL"))
+Session = sessionmaker(bind=engine)
+
+def fix():
+    s = Session()
+    try:
+        print("Moviendo partido 762 al viernes 23:00...")
+        
+        # Mover partido 762 de jueves a viernes
+        s.execute(text("""
+            UPDATE partidos
+            SET fecha_hora = '2026-03-06 23:00:00'
+            WHERE id_partido = 762
+        """))
+        
+        s.commit()
+        print("✅ Partido 762 movido al viernes 06/03 23:00")
+        
+    except Exception as e:
+        s.rollback()
+        print(f"❌ Error: {e}")
+    finally:
+        s.close()
+
+if __name__ == "__main__":
+    fix()

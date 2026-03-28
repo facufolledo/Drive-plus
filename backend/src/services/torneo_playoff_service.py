@@ -304,7 +304,7 @@ class TorneoPlayoffService:
             zonas[z] = sorted(zonas[z], key=lambda x: (x['posicion'], -x.get('puntos', 0)))
 
         zona_map = {}
-        letras = ['A', 'B', 'C', 'D', 'E', 'F']
+        letras = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
         for i, nombre in enumerate(nombres_zonas_orden[:num_zonas]):
             zona_map[letras[i]] = nombre
 
@@ -414,7 +414,7 @@ class TorneoPlayoffService:
                     ('prev', 'prev'),
                 ]),
             ]
-        else:  # num_zonas == 6
+        elif num_zonas == 6:
             # APA 6 zonas: 8vos con 4 BYEs + 4tos + semis + final
             rondas = [
                 ('8vos', [
@@ -435,6 +435,68 @@ class TorneoPlayoffService:
                 ]),
                 ('semis', [
                     ('prev', 'prev'),
+                    ('prev', 'prev'),
+                ]),
+                ('final', [
+                    ('prev', 'prev'),
+                ]),
+            ]
+        elif num_zonas == 7:
+            # APA 7 zonas: 16avos con 2 BYEs + 8vos + 4tos + semis + final
+            # 14 clasificados (7 zonas × 2) → bracket de 16 con 2 BYEs
+            rondas = [
+                ('16avos', [
+                    (('A', 1), None),        # slot 1: BYE 1°A
+                    (('F', 2), ('G', 2)),    # slot 2: 2°F vs 2°G
+                    (('E', 1), ('C', 2)),    # slot 3: 1°E vs 2°C
+                    (('D', 1), ('B', 2)),    # slot 4: 1°D vs 2°B
+                    (('C', 1), ('E', 2)),    # slot 5: 1°C vs 2°E
+                    (('B', 1), ('D', 2)),    # slot 6: 1°B vs 2°D
+                    (('F', 1), ('A', 2)),    # slot 7: 1°F vs 2°A
+                    (('G', 1), None),        # slot 8: BYE 1°G
+                ]),
+                ('8vos', [
+                    ('prev', 'prev'),
+                    ('prev', 'prev'),
+                    ('prev', 'prev'),
+                    ('prev', 'prev'),
+                ]),
+                ('4tos', [
+                    ('prev', 'prev'),
+                    ('prev', 'prev'),
+                ]),
+                ('semis', [
+                    ('prev', 'prev'),
+                ]),
+                ('final', [
+                    ('prev', 'prev'),
+                ]),
+            ]
+        else:  # num_zonas == 8
+            # APA 8 zonas (16 parejas): 16avos según formato oficial APA
+            # Formato exacto proporcionado por el usuario
+            rondas = [
+                ('16avos', [
+                    (('A', 1), ('H', 2)),    # slot 1: 1°A vs 2°H
+                    (('B', 1), ('G', 2)),    # slot 2: 1°B vs 2°G
+                    (('C', 1), ('F', 2)),    # slot 3: 1°C vs 2°F
+                    (('D', 1), ('E', 2)),    # slot 4: 1°D vs 2°E
+                    (('D', 2), ('F', 1)),    # slot 5: 2°D vs 1°F
+                    (('C', 2), ('E', 1)),    # slot 6: 2°C vs 1°E
+                    (('B', 2), ('G', 1)),    # slot 7: 2°B vs 1°G
+                    (('A', 2), ('H', 1)),    # slot 8: 2°A vs 1°H
+                ]),
+                ('8vos', [
+                    ('prev', 'prev'),
+                    ('prev', 'prev'),
+                    ('prev', 'prev'),
+                    ('prev', 'prev'),
+                ]),
+                ('4tos', [
+                    ('prev', 'prev'),
+                    ('prev', 'prev'),
+                ]),
+                ('semis', [
                     ('prev', 'prev'),
                 ]),
                 ('final', [

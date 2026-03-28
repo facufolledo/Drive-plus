@@ -647,6 +647,79 @@ export default function TorneoFixture({ torneoId, esOrganizador }: TorneoFixture
         </div>
       </div>
 
+      {/* Gestión de fixture por categoría - NUEVO */}
+      {esOrganizador && categorias.length > 0 && (
+        <Card>
+          <div className="p-4">
+            <h4 className="text-sm font-bold text-textSecondary mb-3">Gestión de Fixture por Categoría:</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {categorias.map(cat => {
+                // Contar partidos de esta categoría
+                const partidosCategoria = partidos.filter(p => p.categoria_id === cat.id);
+                const tienePartidos = partidosCategoria.length > 0;
+                
+                const colorClass = cat.genero === 'masculino'
+                  ? 'border-blue-500/50'
+                  : cat.genero === 'femenino'
+                  ? 'border-pink-500/50'
+                  : 'border-purple-500/50';
+                
+                const textColor = cat.genero === 'masculino'
+                  ? 'text-blue-400'
+                  : cat.genero === 'femenino'
+                  ? 'text-pink-400'
+                  : 'text-purple-400';
+                
+                return (
+                  <div
+                    key={cat.id}
+                    className={`p-3 rounded-lg border-2 ${colorClass} bg-background`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <h5 className={`font-bold text-sm ${textColor}`}>{cat.nombre}</h5>
+                        <p className="text-[10px] text-textSecondary">
+                          {cat.parejas_inscritas} parejas • {partidosCategoria.length} partidos
+                        </p>
+                      </div>
+                      {tienePartidos && (
+                        <span className="text-xs px-2 py-0.5 bg-green-500/20 text-green-500 rounded-full font-bold">
+                          ✓
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => generarFixture(cat.id)}
+                        disabled={generando}
+                        className={`flex-1 px-3 py-1.5 rounded text-xs font-bold transition-all ${
+                          tienePartidos
+                            ? 'bg-accent/20 text-accent hover:bg-accent/30 border border-accent/30'
+                            : 'bg-primary/20 text-primary hover:bg-primary/30 border border-primary/30'
+                        } ${generando ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        {tienePartidos ? 'Regenerar' : 'Generar'}
+                      </button>
+                      {tienePartidos && (
+                        <button
+                          onClick={() => eliminarFixture(cat.id)}
+                          disabled={generando}
+                          className={`px-3 py-1.5 rounded text-xs font-bold transition-all bg-red-500/20 text-red-500 hover:bg-red-500/30 border border-red-500/30 ${
+                            generando ? 'opacity-50 cursor-not-allowed' : ''
+                          }`}
+                        >
+                          Borrar
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* Partidos por zona */}
       <div ref={fixtureRef} className="space-y-6">
       {zonasConPartidos

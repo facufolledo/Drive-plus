@@ -1,0 +1,68 @@
+"""
+Corregir restricciones de pareja 1008 (Juin + López) - 7MA
+No pueden jugar después de las 23:30 el viernes
+Disponibles: viernes 18:00-23:30, sábado después de 12:00
+"""
+import sys, os, json
+sys.path.insert(0, os.path.dirname(__file__))
+from sqlalchemy import create_engine, text
+
+env_file = os.path.join(os.path.dirname(__file__), '.env.production')
+DATABASE_URL = None
+if os.path.exists(env_file):
+    with open(env_file) as f:
+        for line in f:
+            if line.startswith('DATABASE_URL='):
+                DATABASE_URL = line.split('=', 1)[1].strip().strip('"').strip("'")
+                break
+
+engine = create_engine(DATABASE_URL)
+
+PAREJA_ID = 1008
+
+# Disponibles: viernes 18:00-23:30, sábado +12:00
+# Restricciones: viernes antes de 18:00, viernes después de 23:30, sábado antes de 12:00
+RESTRICCIONES = [
+    {"dias": ["viernes"], "horaInicio": "00:00", "horaFin": "18:00"},
+    {"dias": ["viernes"], "horaInicio": "23:30", "horaFin": "23:59"},
+    {"dias": ["sabado"], "horaInicio": "00:00", "horaFin": "12:00"},
+]
+
+def main():
+    print("=" * 80)
+    print(f"CORRIGIENDO RESTRICCIONES PAREJA {PAREJA_ID}")
+    print("=" * 80)
+    
+    with engine.connect() as conn:
+        pareja = conn.execute(text("""
+            SELECT tp.id, u1.nombre_usuario, u2.nombre_usuario, p1.nombre, p1.apellido, p2.nombre, p2.apellido
+            FROM torneos_parejas tp
+            JOIN usuarios u1 ON tp.jugador1_id = u1.id_usuario
+            JOIN usuarios u2 ON tp.jugador2_id = u2.id_usuario
+            LEFT JOIN perfil_usuarios p1 ON u1.id_usuario = p1.id_usuario
+            LEFT JOIN perfil_usuarios p2 ON u2.id_usuario = p2.id_usuario
+            WHERE tp.id = :pid
+        """), {"pid": PAREJA_ID}).fetchone()
+        
+        if not pareja:
+            print(f"❌ ERROR: Pareja {PAREJA_ID} no encontrada")
+            return
+        
+        print(f"✅ Pareja: {pareja[3]} {pareja[4]} + {pareja[5]} {pareja[6]}")
+        print(f"   Disponibles: viernes 18:00-23:30, sábado +12:00")
+        print(f"   Restricciones: {len(RESTRICCIONES)} bloques\n")
+        
+        restr_json = json.dumps(RESTRICCIONES)
+        
+        conn.execute(text("""
+            UPDATE torneos_parejas 
+            SET disponibilidad_horaria = CAST(:r AS jsonb)
+            WHERE id = :pid
+        """), {"pid": PAREJA_ID, "r": restr_json})
+        
+        conn.commit()
+        
+        print("✅ Restricciones actualizadas correctamente")
+
+if __name__ == "__main__":
+    main()

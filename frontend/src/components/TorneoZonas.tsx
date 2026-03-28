@@ -249,11 +249,28 @@ export default function TorneoZonas({ torneoId, esOrganizador }: TorneoZonasProp
   const irAlFixture = (zonaId?: number, categoriaId?: number) => {
     // Emitir evento para cambiar de tab con filtros opcionales
     window.dispatchEvent(new CustomEvent('cambiarTab', { 
-      detail: 'partidos',
+      detail: {
+        tab: 'partidos',
       // Pasar filtros adicionales si se proporcionan
       ...(zonaId && { zonaId }),
       ...(categoriaId && { categoriaId })
+      }
     }));
+  };
+
+  const generarFixtureCategoriaActual = async () => {
+    if (!categoriaFiltro) return;
+    try {
+      setGenerando(true);
+      setError(null);
+      await torneoService.generarFixture(torneoId, categoriaFiltro);
+      // Ir directo al tab Fixture con la categoría seleccionada
+      irAlFixture(undefined, categoriaFiltro);
+    } catch (error: any) {
+      setError(error.response?.data?.detail || 'Error al generar fixture');
+    } finally {
+      setGenerando(false);
+    }
   };
 
   // Función para abrir modal de horarios
@@ -290,6 +307,20 @@ export default function TorneoZonas({ torneoId, esOrganizador }: TorneoZonasProp
       {/* Header con botones */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
+          {/* Generar fixture de la categoría seleccionada (solo organizador) */}
+          {esOrganizador && categoriaFiltro && (
+            <Button
+              onClick={generarFixtureCategoriaActual}
+              disabled={generando}
+              variant="primary"
+              size="sm"
+              className="flex items-center gap-2 text-xs"
+            >
+              <Calendar size={14} />
+              {generando ? 'Generando...' : `Generar Fixture`}
+            </Button>
+          )}
+
           {/* Botón ir al fixture (solo organizador) */}
           {esOrganizador && (
             <Button

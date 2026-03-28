@@ -2048,7 +2048,15 @@ def verificar_solapamientos(
         if not torneo:
             raise HTTPException(status_code=404, detail="Torneo no encontrado")
         
-        if torneo.creado_por != current_user.id_usuario:
+        # Verificar si es creador o organizador
+        from ..models.torneo_models import TorneoOrganizador
+        es_creador = torneo.creado_por == current_user.id_usuario
+        es_organizador = db.query(TorneoOrganizador).filter(
+            TorneoOrganizador.torneo_id == torneo_id,
+            TorneoOrganizador.user_id == current_user.id_usuario
+        ).first() is not None
+        
+        if not (es_creador or es_organizador):
             raise HTTPException(status_code=403, detail="No tienes permisos")
         
         # Obtener todos los partidos programados del torneo
