@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, Trophy, AlertCircle, X, MapPin, Clock, Camera, Filter } from 'lucide-react';
+import { Calendar, Trophy, AlertCircle, X, MapPin, Clock, Camera, Filter, Zap } from 'lucide-react';
 import { torneoService, Categoria } from '../services/torneo.service';
 import Card from './Card';
 import Button from './Button';
@@ -41,6 +41,10 @@ export default function TorneoFixture({ torneoId, esOrganizador }: TorneoFixture
   const [verificando, setVerificando] = useState(false);
   const [solapamientos, setSolapamientos] = useState<any[]>([]);
   const [modalSolapamientosOpen, setModalSolapamientosOpen] = useState(false);
+  const [modoEdicionMasiva, setModoEdicionMasiva] = useState(false);
+  const [resultadosMasivos, setResultadosMasivos] = useState<Record<number, any>>({});
+  const [guardandoMasivo, setGuardandoMasivo] = useState(false);
+  const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   // Helper para parsear fechas sin conversión de zona horaria
   const parseFechaLocal = (fechaStr: string) => {
@@ -294,6 +298,375 @@ export default function TorneoFixture({ torneoId, esOrganizador }: TorneoFixture
     }
     
     setPartidoSeleccionado(null);
+  };
+
+  const guardarResultadosMasivos = async () => {
+    try {
+      setGuardandoMasivo(true);
+      setError(null);
+
+      // VALIDAR TODOS LOS RESULTADOS ANTES DE ENVIAR
+      const partidosConResultados = Object.entries(resultadosMasivos).filter(([partidoId, resultado]) => {
+        // Verificar que al menos el set 1 tenga ambos valores
+        const set1_a = resultado.set1_a;
+        const set1_b = resultado.set1_b;
+        return set1_a && set1_b;
+      });
+
+      // Validar cada partido
+      for (const [partidoIdStr, resultado] of partidosConResultados) {
+        const partidoId = parseInt(partidoIdStr);
+        
+        // Validar Set 1
+        if (resultado.set1_a && resultado.set1_b) {
+          if (esSetInvalido(partidoId, 1)) {
+            setError(`⚠️ Resultado inválido en Set 1 del partido. Corregí el resultado antes de guardar.`);
+            // Hacer focus en el primer input inválido
+            const refKey = `${partidoId}_set1_a`;
+            inputRefs.current[refKey]?.focus();
+            return;
+          }
+        }
+        
+        // Validar Set 2
+        if (resultado.set2_a && resultado.set2_b) {
+          if (esSetInvalido(partidoId, 2)) {
+            setError(`⚠️ Resultado inválido en Set 2 del partido. Corregí el resultado antes de guardar.`);
+            const refKey = `${partidoId}_set2_a`;
+            inputRefs.current[refKey]?.focus();
+            return;
+          }
+        }
+        
+        // Validar Set 3
+        if (resultado.set3_a && resultado.set3_b) {
+          if (esSetInvalido(partidoId, 3)) {
+            setError(`⚠️ Resultado inválido en Set 3 del partido. Corregí el resultado antes de guardar.`);
+            const refKey = `${partidoId}_set3_a`;
+            inputRefs.current[refKey]?.focus();
+            return;
+          }
+        }
+        
+        // Validar que haya un ganador con al menos 2 sets
+        const { setsA, setsB } = contarSetsGanados(partidoId);
+        
+        if (setsA < 2 && setsB < 2) {
+          setError(`⚠️ Debe haber un ganador con al menos 2 sets en el partido.`);
+          const refKey = `${partidoId}_set1_a`;
+          inputRefs.current[refKey]?.focus();
+          return;
+        }
+      }
+
+      // Filtrar y construir resultados para enviar
+      const resultadosParaEnviar = partidosConResultados.map(([partidoId, resultado]) => {
+        const partidoIdNum = parseInt(partidoId);
+        
+        // Construir el texto del resultado solo con sets válidos
+        let textoResultado = '';
+        
+        // Set 1
+        const set1_a = parseInt(resultado.set1_a) || 0;
+        const set1_b = parseInt(resultado.set1_b) || 0;
+        if (validarSet(set1_a, set1_b)) {
+          textoResultado = `${set1_a}-${set1_b}`;
+        }
+        
+        // Set 2
+        const set2_a = parseInt(resultado.set2_a) || 0;
+        const set2_b = parseInt(resultado.set2_b) || 0;
+        if (validarSet(set2_a, set2_b)) {
+          textoResultado += ` ${set2_a}-${set2_b}`;
+        }
+        
+        // Set 3 (solo si es válido)
+        const set3_a = parseInt(resultado.set3_a) || 0;
+        const set3_b = parseInt(resultado.set3_b) || 0;
+        if (validarSet(set3_a, set3_b)) {
+          textoResultado += ` ${set3_a}-${set3_b}`;
+        }
+        
+        return {
+          partido_id: partidoIdNum,
+          resultado_texto: textoResultado.trim()
+        };
+      });
+
+      if (resultadosParaEnviar.length === 0) {
+        setError('⚠️ No hay resultados válidos para guardar. Completá al menos 2 sets válidos por partido.');
+        return;
+      }
+
+      // Enviar al backend
+      const response = await torneoService.cargarResultadosMasivo(torneoId, {
+        resultados: resultadosParaEnviar
+      });
+
+      // Mostrar detalles de errores si los hay
+      if (response.fallidos > 0 && response.resultados) {
+        const errores = response.resultados
+          .filter((r: any) => !r.exito)
+          .map((r: any) => `Partido ${r.partido_id}: ${r.error || r.mensaje}`)
+          .join('\n');
+        
+        setError(`⚠️ ${response.exitosos} guardado(s), ${response.fallidos} fallido(s):\n${errores}`);
+        
+        // No salir del modo edición si hay errores
+        // Recargar datos para actualizar los que sí se guardaron
+        await cargarDatos();
+        
+        return;
+      }
+
+      // Mostrar mensaje de éxito
+      setError(`✅ ${response.exitosos} resultado(s) guardado(s) exitosamente`);
+      
+      // Recargar datos
+      await cargarDatos();
+      
+      // Salir del modo edición
+      setModoEdicionMasiva(false);
+      setResultadosMasivos({});
+      
+      // Limpiar mensaje después de 4 segundos
+      setTimeout(() => setError(null), 4000);
+      
+    } catch (error: any) {
+      console.error('Error guardando resultados masivos:', error);
+      let errorMsg = 'Error al guardar resultados';
+      if (error.response?.data?.detail) {
+        errorMsg = error.response.data.detail;
+      } else if (error.message) {
+        errorMsg = error.message;
+      }
+      setError(`❌ ${errorMsg}`);
+    } finally {
+      setGuardandoMasivo(false);
+    }
+  };
+
+  const handleInputChange = (partidoId: number, campo: string, valor: string) => {
+    // Solo permitir números
+    if (valor && !/^\d+$/.test(valor)) return;
+    
+    // Limitar a 0-7
+    if (valor) {
+      const valorNum = parseInt(valor);
+      if (valorNum > 7) return;
+    }
+    
+    // Actualizar el valor SIN VALIDACIONES (permitir editar libremente)
+    setResultadosMasivos(prev => {
+      const nuevoResultado = {
+        ...prev,
+        [partidoId]: {
+          ...prev[partidoId],
+          [campo]: valor
+        }
+      };
+      
+      // Auto-avance: si se ingresó un valor, pasar al siguiente input
+      if (valor) {
+        // Orden correcto: set1_a → set1_b → set2_a → set2_b → set3_a → set3_b
+        const campos = ['set1_a', 'set1_b', 'set2_a', 'set2_b', 'set3_a', 'set3_b'];
+        const currentIndex = campos.indexOf(campo);
+        
+        if (currentIndex < campos.length - 1) {
+          // Siguiente campo en el mismo partido
+          const nextCampo = campos[currentIndex + 1];
+          
+          // Calcular si el set 3 debería estar bloqueado CON EL NUEVO ESTADO
+          const shouldBlockSet3 = nextCampo.startsWith('set3_') && (() => {
+            const resultado = nuevoResultado[partidoId];
+            if (!resultado) return false;
+            
+            // Contar sets ganados con el nuevo estado
+            let setsA = 0;
+            let setsB = 0;
+            
+            const set1_a = parseInt(resultado.set1_a) || 0;
+            const set1_b = parseInt(resultado.set1_b) || 0;
+            if (validarSet(set1_a, set1_b)) {
+              if (set1_a > set1_b) setsA++;
+              else setsB++;
+            }
+            
+            const set2_a = parseInt(resultado.set2_a) || 0;
+            const set2_b = parseInt(resultado.set2_b) || 0;
+            if (validarSet(set2_a, set2_b)) {
+              if (set2_a > set2_b) setsA++;
+              else setsB++;
+            }
+            
+            // Hay ganador en 2 sets?
+            const hayGanador = setsA >= 2 || setsB >= 2;
+            if (!hayGanador) return false;
+            
+            // Si el set 3 ya tiene valores, NO bloquear
+            const tieneValoresSet3 = resultado.set3_a || resultado.set3_b;
+            return !tieneValoresSet3;
+          })();
+          
+          if (shouldBlockSet3) {
+            const partidosPendientes = partidos.filter(p => p.estado === 'pendiente');
+            const currentPartidoIndex = partidosPendientes.findIndex(p => p.id_partido === partidoId);
+            if (currentPartidoIndex < partidosPendientes.length - 1) {
+              const nextPartido = partidosPendientes[currentPartidoIndex + 1];
+              const refKey = `${nextPartido.id_partido}_set1_a`;
+              setTimeout(() => inputRefs.current[refKey]?.focus(), 50);
+            }
+          } else {
+            const refKey = `${partidoId}_${nextCampo}`;
+            setTimeout(() => inputRefs.current[refKey]?.focus(), 50);
+          }
+        } else {
+          // Último campo del partido, ir al primer campo del siguiente partido
+          const partidosPendientes = partidos.filter(p => p.estado === 'pendiente');
+          const currentPartidoIndex = partidosPendientes.findIndex(p => p.id_partido === partidoId);
+          if (currentPartidoIndex < partidosPendientes.length - 1) {
+            const nextPartido = partidosPendientes[currentPartidoIndex + 1];
+            const refKey = `${nextPartido.id_partido}_set1_a`;
+            setTimeout(() => inputRefs.current[refKey]?.focus(), 50);
+          }
+        }
+      }
+      
+      return nuevoResultado;
+    });
+  };
+
+  const validarSet = (gamesA: number, gamesB: number): boolean => {
+    const mayor = Math.max(gamesA, gamesB);
+    const menor = Math.min(gamesA, gamesB);
+    
+    // 6-0, 6-1, 6-2, 6-3, 6-4
+    if (mayor === 6 && menor <= 4) return true;
+    // 7-5
+    if (mayor === 7 && menor === 5) return true;
+    // 7-6 (tiebreak)
+    if (mayor === 7 && menor === 6) return true;
+    
+    return false;
+  };
+
+  const contarSetsGanados = (partidoId: number): { setsA: number; setsB: number } => {
+    const resultado = resultadosMasivos[partidoId];
+    if (!resultado) return { setsA: 0, setsB: 0 };
+
+    let setsA = 0;
+    let setsB = 0;
+
+    // Set 1
+    const set1_a = parseInt(resultado.set1_a) || 0;
+    const set1_b = parseInt(resultado.set1_b) || 0;
+    if (validarSet(set1_a, set1_b)) {
+      if (set1_a > set1_b) setsA++;
+      else setsB++;
+    }
+
+    // Set 2
+    const set2_a = parseInt(resultado.set2_a) || 0;
+    const set2_b = parseInt(resultado.set2_b) || 0;
+    if (validarSet(set2_a, set2_b)) {
+      if (set2_a > set2_b) setsA++;
+      else setsB++;
+    }
+
+    // Set 3
+    const set3_a = parseInt(resultado.set3_a) || 0;
+    const set3_b = parseInt(resultado.set3_b) || 0;
+    if (validarSet(set3_a, set3_b)) {
+      if (set3_a > set3_b) setsA++;
+      else setsB++;
+    }
+
+    return { setsA, setsB };
+  };
+
+  const hayGanadorEn2Sets = (partidoId: number): boolean => {
+    const { setsA, setsB } = contarSetsGanados(partidoId);
+    return setsA >= 2 || setsB >= 2;
+  };
+
+  const debeBloquearSet3 = (partidoId: number): boolean => {
+    // Bloquear solo si hay ganador en 2 sets Y el set 3 está vacío
+    if (!hayGanadorEn2Sets(partidoId)) return false;
+    
+    const resultado = resultadosMasivos[partidoId];
+    if (!resultado) return false;
+    
+    // Si el set 3 ya tiene valores, NO bloquear (permitir editar)
+    const tieneValoresSet3 = resultado.set3_a || resultado.set3_b;
+    return !tieneValoresSet3;
+  };
+
+  const esSetValido = (partidoId: number, numSet: 1 | 2 | 3): boolean => {
+    const resultado = resultadosMasivos[partidoId];
+    if (!resultado) return false;
+
+    const campoA = `set${numSet}_a` as keyof typeof resultado;
+    const campoB = `set${numSet}_b` as keyof typeof resultado;
+    
+    const gamesA = parseInt(resultado[campoA] as string) || 0;
+    const gamesB = parseInt(resultado[campoB] as string) || 0;
+
+    return validarSet(gamesA, gamesB);
+  };
+
+  const esSetInvalido = (partidoId: number, numSet: 1 | 2 | 3): boolean => {
+    const resultado = resultadosMasivos[partidoId];
+    if (!resultado) return false;
+
+    const campoA = `set${numSet}_a` as keyof typeof resultado;
+    const campoB = `set${numSet}_b` as keyof typeof resultado;
+    
+    const valorA = resultado[campoA] as string;
+    const valorB = resultado[campoB] as string;
+    
+    // Si ambos campos tienen valor, verificar si es inválido
+    if (valorA && valorB) {
+      const gamesA = parseInt(valorA);
+      const gamesB = parseInt(valorB);
+      return !validarSet(gamesA, gamesB);
+    }
+    
+    return false;
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, partidoId: number, campo: string) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      
+      // Determinar el siguiente campo
+      const campos = ['set1_a', 'set1_b', 'set2_a', 'set2_b', 'set3_a', 'set3_b'];
+      const currentIndex = campos.indexOf(campo);
+      
+      if (e.shiftKey) {
+        // Tab + Shift: ir al campo anterior
+        if (currentIndex > 0) {
+          const prevCampo = campos[currentIndex - 1];
+          const refKey = `${partidoId}_${prevCampo}`;
+          inputRefs.current[refKey]?.focus();
+        }
+      } else {
+        // Tab: ir al siguiente campo
+        if (currentIndex < campos.length - 1) {
+          const nextCampo = campos[currentIndex + 1];
+          const refKey = `${partidoId}_${nextCampo}`;
+          inputRefs.current[refKey]?.focus();
+        } else {
+          // Si estamos en el último campo, ir al primer campo del siguiente partido
+          const partidosPendientes = partidos.filter(p => p.estado === 'pendiente');
+          const currentPartidoIndex = partidosPendientes.findIndex(p => p.id_partido === partidoId);
+          if (currentPartidoIndex < partidosPendientes.length - 1) {
+            const nextPartido = partidosPendientes[currentPartidoIndex + 1];
+            const refKey = `${nextPartido.id_partido}_set1_a`;
+            inputRefs.current[refKey]?.focus();
+          }
+        }
+      }
+    }
   };
 
   if (loading) {
@@ -620,6 +993,59 @@ export default function TorneoFixture({ torneoId, esOrganizador }: TorneoFixture
         </div>
         
         <div className="flex items-center gap-2 self-end sm:self-auto">
+          {/* Botón Carga Masiva - solo si hay partidos pendientes y es organizador */}
+          {esOrganizador && partidos.filter(p => p.estado === 'pendiente').length > 0 && (
+            <>
+              {!modoEdicionMasiva ? (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => {
+                    setModoEdicionMasiva(true);
+                    // Inicializar resultados vacíos para todos los partidos pendientes
+                    const inicial: Record<number, any> = {};
+                    partidos.filter(p => p.estado === 'pendiente').forEach(p => {
+                      inicial[p.id_partido] = {
+                        set1_a: '', set1_b: '',
+                        set2_a: '', set2_b: '',
+                        set3_a: '', set3_b: ''
+                      };
+                    });
+                    setResultadosMasivos(inicial);
+                  }}
+                  className="flex items-center gap-2 text-xs bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
+                >
+                  <Zap size={14} />
+                  Cargar Resultados
+                </Button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setModoEdicionMasiva(false);
+                      setResultadosMasivos({});
+                    }}
+                    disabled={guardandoMasivo}
+                    className="text-xs"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={guardarResultadosMasivos}
+                    disabled={guardandoMasivo}
+                    className="flex items-center gap-2 text-xs bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+                  >
+                    {guardandoMasivo ? 'Guardando...' : 'Guardar Todos'}
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+          
           {/* Botón verificar solapamientos - solo si hay partidos */}
           {esOrganizador && partidos.length > 0 && (
             <Button
@@ -838,18 +1264,77 @@ export default function TorneoFixture({ torneoId, esOrganizador }: TorneoFixture
                               <AdminId id={partido.pareja1_id} prefix="PA" />
                             </div>
                             <div className="flex items-center gap-2">
-                              {partido.resultado_padel && (
-                                <span className={`text-xl md:text-2xl font-bold ${ganadorA ? 'text-green-500' : 'text-textSecondary'}`}>
-                                  {setsEquipoA}
-                                </span>
+                              {/* Modo edición: mostrar inputs */}
+                              {modoEdicionMasiva && esOrganizador && partido.estado === 'pendiente' ? (
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    ref={(el) => inputRefs.current[`${partido.id_partido}_set1_a`] = el}
+                                    type="text"
+                                    inputMode="numeric"
+                                    maxLength={1}
+                                    value={resultadosMasivos[partido.id_partido]?.set1_a || ''}
+                                    onChange={(e) => handleInputChange(partido.id_partido, 'set1_a', e.target.value)}
+                                    onKeyDown={(e) => handleKeyDown(e, partido.id_partido, 'set1_a')}
+                                    className={`w-8 h-8 text-center bg-background border-2 rounded text-sm font-bold text-textPrimary focus:border-primary focus:outline-none ${
+                                      esSetInvalido(partido.id_partido, 1) 
+                                        ? 'border-red-500' 
+                                        : esSetValido(partido.id_partido, 1) 
+                                        ? 'border-green-500' 
+                                        : 'border-cardBorder'
+                                    }`}
+                                  />
+                                  <input
+                                    ref={(el) => inputRefs.current[`${partido.id_partido}_set2_a`] = el}
+                                    type="text"
+                                    inputMode="numeric"
+                                    maxLength={1}
+                                    value={resultadosMasivos[partido.id_partido]?.set2_a || ''}
+                                    onChange={(e) => handleInputChange(partido.id_partido, 'set2_a', e.target.value)}
+                                    onKeyDown={(e) => handleKeyDown(e, partido.id_partido, 'set2_a')}
+                                    className={`w-8 h-8 text-center bg-background border-2 rounded text-sm font-bold text-textPrimary focus:border-primary focus:outline-none ${
+                                      esSetInvalido(partido.id_partido, 2) 
+                                        ? 'border-red-500' 
+                                        : esSetValido(partido.id_partido, 2) 
+                                        ? 'border-green-500' 
+                                        : 'border-cardBorder'
+                                    }`}
+                                  />
+                                  <input
+                                    ref={(el) => inputRefs.current[`${partido.id_partido}_set3_a`] = el}
+                                    type="text"
+                                    inputMode="numeric"
+                                    maxLength={1}
+                                    value={resultadosMasivos[partido.id_partido]?.set3_a || ''}
+                                    onChange={(e) => handleInputChange(partido.id_partido, 'set3_a', e.target.value)}
+                                    onKeyDown={(e) => handleKeyDown(e, partido.id_partido, 'set3_a')}
+                                    disabled={debeBloquearSet3(partido.id_partido)}
+                                    className={`w-8 h-8 text-center bg-background border-2 rounded text-sm font-bold text-textPrimary focus:border-primary focus:outline-none ${
+                                      debeBloquearSet3(partido.id_partido)
+                                        ? 'opacity-30 cursor-not-allowed border-cardBorder'
+                                        : esSetInvalido(partido.id_partido, 3) 
+                                        ? 'border-red-500' 
+                                        : esSetValido(partido.id_partido, 3) 
+                                        ? 'border-green-500' 
+                                        : 'border-cardBorder'
+                                    }`}
+                                  />
+                                </div>
+                              ) : (
+                                <>
+                                  {partido.resultado_padel && (
+                                    <span className={`text-xl md:text-2xl font-bold ${ganadorA ? 'text-green-500' : 'text-textSecondary'}`}>
+                                      {setsEquipoA}
+                                    </span>
+                                  )}
+                                  <button
+                                    onClick={() => verHorariosPareja(partido, 'pareja1')}
+                                    className="p-1 hover:bg-primary/10 rounded transition-colors text-primary hover:text-accent flex-shrink-0"
+                                    title="Ver horarios disponibles"
+                                  >
+                                    <Clock size={14} className="md:w-4 md:h-4" />
+                                  </button>
+                                </>
                               )}
-                              <button
-                                onClick={() => verHorariosPareja(partido, 'pareja1')}
-                                className="p-1 hover:bg-primary/10 rounded transition-colors text-primary hover:text-accent flex-shrink-0"
-                                title="Ver horarios disponibles"
-                              >
-                                <Clock size={14} className="md:w-4 md:h-4" />
-                              </button>
                             </div>
                           </div>
 
@@ -865,18 +1350,77 @@ export default function TorneoFixture({ torneoId, esOrganizador }: TorneoFixture
                               <AdminId id={partido.pareja2_id} prefix="PA" />
                             </div>
                             <div className="flex items-center gap-2">
-                              {partido.resultado_padel && (
-                                <span className={`text-xl md:text-2xl font-bold ${ganadorB ? 'text-green-500' : 'text-textSecondary'}`}>
-                                  {setsEquipoB}
-                                </span>
+                              {/* Modo edición: mostrar inputs */}
+                              {modoEdicionMasiva && esOrganizador && partido.estado === 'pendiente' ? (
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    ref={(el) => inputRefs.current[`${partido.id_partido}_set1_b`] = el}
+                                    type="text"
+                                    inputMode="numeric"
+                                    maxLength={1}
+                                    value={resultadosMasivos[partido.id_partido]?.set1_b || ''}
+                                    onChange={(e) => handleInputChange(partido.id_partido, 'set1_b', e.target.value)}
+                                    onKeyDown={(e) => handleKeyDown(e, partido.id_partido, 'set1_b')}
+                                    className={`w-8 h-8 text-center bg-background border-2 rounded text-sm font-bold text-textPrimary focus:border-primary focus:outline-none ${
+                                      esSetInvalido(partido.id_partido, 1) 
+                                        ? 'border-red-500' 
+                                        : esSetValido(partido.id_partido, 1) 
+                                        ? 'border-green-500' 
+                                        : 'border-cardBorder'
+                                    }`}
+                                  />
+                                  <input
+                                    ref={(el) => inputRefs.current[`${partido.id_partido}_set2_b`] = el}
+                                    type="text"
+                                    inputMode="numeric"
+                                    maxLength={1}
+                                    value={resultadosMasivos[partido.id_partido]?.set2_b || ''}
+                                    onChange={(e) => handleInputChange(partido.id_partido, 'set2_b', e.target.value)}
+                                    onKeyDown={(e) => handleKeyDown(e, partido.id_partido, 'set2_b')}
+                                    className={`w-8 h-8 text-center bg-background border-2 rounded text-sm font-bold text-textPrimary focus:border-primary focus:outline-none ${
+                                      esSetInvalido(partido.id_partido, 2) 
+                                        ? 'border-red-500' 
+                                        : esSetValido(partido.id_partido, 2) 
+                                        ? 'border-green-500' 
+                                        : 'border-cardBorder'
+                                    }`}
+                                  />
+                                  <input
+                                    ref={(el) => inputRefs.current[`${partido.id_partido}_set3_b`] = el}
+                                    type="text"
+                                    inputMode="numeric"
+                                    maxLength={1}
+                                    value={resultadosMasivos[partido.id_partido]?.set3_b || ''}
+                                    onChange={(e) => handleInputChange(partido.id_partido, 'set3_b', e.target.value)}
+                                    onKeyDown={(e) => handleKeyDown(e, partido.id_partido, 'set3_b')}
+                                    disabled={debeBloquearSet3(partido.id_partido)}
+                                    className={`w-8 h-8 text-center bg-background border-2 rounded text-sm font-bold text-textPrimary focus:border-primary focus:outline-none ${
+                                      debeBloquearSet3(partido.id_partido)
+                                        ? 'opacity-30 cursor-not-allowed border-cardBorder'
+                                        : esSetInvalido(partido.id_partido, 3) 
+                                        ? 'border-red-500' 
+                                        : esSetValido(partido.id_partido, 3) 
+                                        ? 'border-green-500' 
+                                        : 'border-cardBorder'
+                                    }`}
+                                  />
+                                </div>
+                              ) : (
+                                <>
+                                  {partido.resultado_padel && (
+                                    <span className={`text-xl md:text-2xl font-bold ${ganadorB ? 'text-green-500' : 'text-textSecondary'}`}>
+                                      {setsEquipoB}
+                                    </span>
+                                  )}
+                                  <button
+                                    onClick={() => verHorariosPareja(partido, 'pareja2')}
+                                    className="p-1 hover:bg-primary/10 rounded transition-colors text-primary hover:text-accent flex-shrink-0"
+                                    title="Ver horarios disponibles"
+                                  >
+                                    <Clock size={14} className="md:w-4 md:h-4" />
+                                  </button>
+                                </>
                               )}
-                              <button
-                                onClick={() => verHorariosPareja(partido, 'pareja2')}
-                                className="p-1 hover:bg-primary/10 rounded transition-colors text-primary hover:text-accent flex-shrink-0"
-                                title="Ver horarios disponibles"
-                              >
-                                <Clock size={14} className="md:w-4 md:h-4" />
-                              </button>
                             </div>
                           </div>
                         </div>
@@ -902,7 +1446,7 @@ export default function TorneoFixture({ torneoId, esOrganizador }: TorneoFixture
                         )}
 
                         {/* Acciones */}
-                        {esOrganizador && partido.estado === 'pendiente' && (
+                        {esOrganizador && partido.estado === 'pendiente' && !modoEdicionMasiva && (
                           <Button
                             variant="accent"
                             size="sm"

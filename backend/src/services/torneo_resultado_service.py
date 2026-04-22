@@ -801,3 +801,146 @@ class TorneoResultadoService:
         logger.info(f"ELO aplicado para partido de torneo {partido.id_partido}: {resultado_elo}")
         
         return resultado_elo
+
+
+    @staticmethod
+    def parsear_resultado_simplificado(resultado_texto: str) -> Dict:
+        """
+        Parsea un resultado en formato simplificado "6-4 6-3" a formato completo
+        
+        Args:
+            resultado_texto: String con formato "6-4 6-3" o "6-4 4-6 7-5"
+            
+        Returns:
+            Dict con formato completo para cargar_resultado
+            
+        Ejemplo:
+            "6-4 6-3" -> {
+                "sets": [
+                    {"gamesEquipoA": 6, "gamesEquipoB": 4, "ganador": "equipoA", "completado": True},
+                    {"gamesEquipoA": 6, "gamesEquipoB": 3, "ganador": "equipoA", "completado": True}
+                ]
+            }
+        """
+        sets_texto = resultado_texto.strip().split()
+        
+        if len(sets_texto) < 2 or len(sets_texto) > 3:
+            raise ValueError("Debe haber 2 o 3 sets")
+        
+        sets = []
+        sets_equipo_a = 0
+        sets_equipo_b = 0
+        
+        for i, set_texto in enumerate(sets_texto):
+            try:
+                games_a, games_b = map(int, set_texto.split('-'))
+            except ValueError:
+                raise ValueError(f"Formato inválido en set {i+1}: '{set_texto}'")
+            
+            # Validar games
+            if not TorneoResultadoService._validar_games(games_a, games_b):
+                raise ValueError(f"Games inválidos en set {i+1}: {games_a}-{games_b}")
+            
+            # Determinar ganador del set
+            ganador = "equipoA" if games_a > games_b else "equipoB"
+            
+            if ganador == "equipoA":
+                sets_equipo_a += 1
+            else:
+                sets_equipo_b += 1
+            
+            # Detectar si es tiebreak
+            es_tiebreak = (games_a == 7 and games_b == 6) or (games_a == 6 and games_b == 7)
+            
+            sets.append({
+                "gamesEquipoA": games_a,
+                "gamesEquipoB": games_b,
+                "ganador": ganador,
+                "completado": True,
+                "es_tiebreak": es_tiebreak
+            })
+        
+        # Validar que haya un ganador claro
+        if sets_equipo_a < 2 and sets_equipo_b < 2:
+            raise ValueError("Debe haber un ganador con al menos 2 sets")
+        
+        return {
+            "sets": sets
+        }
+    
+    @staticmethod
+    def cargar_resultados_masivo(
+        db: Session,
+        torneo_id: int,
+        resultados_data: List[Dict],
+        user_id: int
+    ) -> Dict:
+        """
+        Carga múltiples resultados de partidos en una sola operación
+        
+        Args:
+            db: Sesión de base de datos
+            torneo_id: ID del torneo
+            resultados_data: Lista de dicts con {partido_id, resultado_texto}
+            user_id: ID del usuario que carga los resultados
+            
+        Returns:
+            Dict con resumen de la operación
+        """
+        from ..services.torneo_zona_service import TorneoZonaService
+        
+        # Verificar que el usuario sea organizador
+        if not TorneoZonaService._es_organizador(db, torneo_id, user_id):
+            raise ValueError("No tienes permisos para cargar resultados en este torneo")
+        
+        resultados = []
+        exitosos = 0
+        fallidos = 0
+        
+        for item in resultados_data:
+            partido_id = item.get('partido_id')
+            resultado_texto = item.get('resultado_texto')
+            
+            try:
+                # Verificar que el partido pertenece al torneo
+                partido = db.query(Partido).filter(
+                    Partido.id_partido == partido_id,
+                    Partido.id_torneo == torneo_id
+                ).first()
+                
+                if not partido:
+                    raise ValueError(f"Partido {partido_id} no encontrado en este torneo")
+                
+                # Parsear resultado simplificado a formato completo
+                resultado_completo = TorneoResultadoService.parsear_resultado_simplificado(resultado_texto)
+                
+                # Cargar resultado usando el método existente
+                partido_actualizado = TorneoResultadoService.cargar_resultado(
+                    db, partido_id, resultado_completo, user_id
+                )
+                
+                resultados.append({
+                    "partido_id": partido_id,
+                    "exito": True,
+                    "mensaje": "Resultado cargado correctamente",
+                    "ganador_pareja_id": partido_actualizado.ganador_pareja_id
+                })
+                exitosos += 1
+                
+            except Exception as e:
+                resultados.append({
+                    "partido_id": partido_id,
+                    "exito": False,
+                    "mensaje": "Error al cargar resultado",
+                    "error": str(e)
+                })
+                fallidos += 1
+                # Continuar con el siguiente partido en lugar de fallar todo
+                logger.error(f"Error cargando resultado partido {partido_id}: {e}")
+        
+        return {
+            "total": len(resultados_data),
+            "exitosos": exitosos,
+            "fallidos": fallidos,
+            "resultados": resultados
+        }

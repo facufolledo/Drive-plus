@@ -41,7 +41,7 @@ class EstadoPartidoEnum(str, Enum):
 
 # Schemas para Categoría de Torneo
 class CategoriaCreate(BaseModel):
-    nombre: str = Field(..., min_length=1, max_length=50)  # "8va", "6ta", "4ta", "Libre"
+    nombre: str = Field(..., min_length=1, max_length=50)  # "8va", "6ta", "4ta", "3ra"
     genero: str = Field(default="masculino")  # masculino, femenino, mixto
     max_parejas: int = Field(default=16, ge=2, le=64)
     orden: int = Field(default=0)
@@ -83,21 +83,21 @@ class TorneoCreate(BaseModel):
         "puntos_derrota": 0,
         "sets_para_ganar": 2
     })
-
+    
     # Campos de pago
     requiere_pago: Optional[bool] = Field(default=False)
     monto_inscripcion: Optional[float] = Field(default=0)
     alias_cbu_cvu: Optional[str] = None
     titular_cuenta: Optional[str] = None
     banco: Optional[str] = None
-    telefono_contacto: Optional[str] = Field(None, description="Telefono para enviar comprobante de pago")
-
-    # Horarios disponibles del torneo
-    horarios_disponibles: Optional[Any] = Field(default_factory=list, description="Horarios disponibles")
-
-    # Codigo de circuito
-    codigo: Optional[str] = Field(None, max_length=20, description="Codigo de circuito")
-
+    telefono_contacto: Optional[str] = Field(None, description="Teléfono para enviar comprobante de pago (ej: +54 9 11 1234-5678)")
+    
+    # Horarios disponibles del torneo (puede ser lista o dict {semana: [], finDeSemana: []})
+    horarios_disponibles: Optional[Any] = Field(default_factory=list, description="Horarios disponibles: lista o dict {semana: [], finDeSemana: []}")
+    
+    # Código de circuito
+    codigo: Optional[str] = Field(None, max_length=20, description="Código de circuito (ej: 'zf' para Zona Fitness)")
+    
     @validator('fecha_fin')
     def validar_fechas(cls, v, values):
         if 'fecha_inicio' in values and v < values['fecha_inicio']:
@@ -131,7 +131,7 @@ class TorneoResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     parejas_inscritas: Optional[int] = 0
-
+    
     # Campos de pago
     requiere_pago: Optional[bool] = False
     monto_inscripcion: Optional[float] = 0
@@ -139,14 +139,14 @@ class TorneoResponse(BaseModel):
     titular_cuenta: Optional[str] = None
     banco: Optional[str] = None
     telefono_contacto: Optional[str] = None
-
+    
     # Horarios
     horarios_disponibles: Optional[Any] = None
     total_partidos: Optional[int] = 0
-
-    # Codigo de circuito
+    
+    # Código de circuito
     codigo: Optional[str] = None
-
+    
     class Config:
         from_attributes = True
 
@@ -155,15 +155,20 @@ class TorneoResponse(BaseModel):
 class ParejaInscripcion(BaseModel):
     jugador1_id: int
     jugador2_id: int
-    categoria_id: Optional[int] = None  # ID de la categoría del torneo
-    nombre_pareja: Optional[str] = None
-    observaciones: Optional[str] = None
+    categoria_id: Optional[int] = Field(default=None)  # ID de la categoría del torneo
+    nombre_pareja: Optional[str] = Field(default=None)
+    observaciones: Optional[str] = Field(default=None)
+    disponibilidad_horaria: Optional[List[dict]] = Field(default=None, description="Array de restricciones: [{dias: [], horaInicio: '', horaFin: ''}]")
     
     @validator('jugador2_id')
     def validar_jugadores_diferentes(cls, v, values):
         if 'jugador1_id' in values and v == values['jugador1_id']:
             raise ValueError('Los jugadores deben ser diferentes')
         return v
+    
+    class Config:
+        # Permitir campos extra y no excluir None
+        extra = 'allow'
 
 
 class ParejaUpdate(BaseModel):
@@ -406,3 +411,211 @@ class EstadisticasTorneoResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+
+# ============================================
+# SCHEMAS PARA PAGOS
+# ============================================
+
+class DisponibilidadHoraria(BaseModel):
+    """Disponibilidad horaria por día de la semana"""
+    lunes: Optional[List[str]] = []
+    martes: Optional[List[str]] = []
+    miercoles: Optional[List[str]] = []
+    jueves: Optional[List[str]] = []
+    viernes: Optional[List[str]] = []
+    sabado: Optional[List[str]] = ['todo_el_dia']
+    domingo: Optional[List[str]] = ['todo_el_dia']
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "lunes": ["08:00-10:00", "17:00-19:00"],
+                "martes": ["17:00-21:00"],
+                "jueves": ["17:00-21:00"],
+                "viernes": ["17:00-21:00"],
+                "sabado": ["todo_el_dia"],
+                "domingo": ["todo_el_dia"]
+            }
+        }
+
+
+class SubirComprobanteRequest(BaseModel):
+    """Request para subir comprobante de pago"""
+    comprobante_url: str
+
+
+class VerificarPagoRequest(BaseModel):
+    """Request para verificar pago (organizador)"""
+    aprobado: bool
+    motivo_rechazo: Optional[str] = None
+
+
+class CambiarCompaneroRequest(BaseModel):
+    """Request para cambiar de compañero"""
+    nuevo_jugador2_id: int
+    motivo: Optional[str] = "Compañero anterior rechazó la invitación"
+
+
+class ActualizarDisponibilidadRequest(BaseModel):
+    """Request para actualizar disponibilidad horaria"""
+    disponibilidad_horaria: DisponibilidadHoraria
+
+
+class DatosPagoResponse(BaseModel):
+    """Response con datos de pago del torneo"""
+    requiere_pago: bool
+    monto_inscripcion: Optional[float] = None
+    alias_cbu_cvu: Optional[str] = None
+    titular_cuenta: Optional[str] = None
+    banco: Optional[str] = None
+    telefono_contacto: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+
+class EstadoPagoResponse(BaseModel):
+    """Response con estado de pago de una pareja"""
+    pareja_id: int
+    pago_estado: str
+    pago_monto: Optional[float] = None
+    pago_comprobante_url: Optional[str] = None
+    pago_fecha_acreditacion: Optional[str] = None
+    motivo_rechazo_pago: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+
+# ============================================
+# Schemas para Sistema de Pagos
+# ============================================
+
+class SubirComprobanteRequest(BaseModel):
+    """Request para subir comprobante de pago"""
+    comprobante_url: str
+    
+class VerificarPagoRequest(BaseModel):
+    """Request para verificar/rechazar pago"""
+    aprobado: bool
+    motivo_rechazo: Optional[str] = None
+
+class CambiarCompaneroRequest(BaseModel):
+    """Request para cambiar de compañero"""
+    nuevo_jugador2_id: int
+    motivo: Optional[str] = None
+
+class ActualizarDisponibilidadRequest(BaseModel):
+    """Request para actualizar disponibilidad horaria"""
+    disponibilidad_horaria: dict  # JSON con formato: {"lunes": ["08:00-10:00"], ...}
+
+class DatosPagoResponse(BaseModel):
+    """Response con datos de pago del torneo"""
+    requiere_pago: bool
+    monto_inscripcion: Optional[float] = None
+    alias_cbu_cvu: Optional[str] = None
+    titular_cuenta: Optional[str] = None
+    banco: Optional[str] = None
+
+class EstadoPagoResponse(BaseModel):
+    """Response con estado de pago de una pareja"""
+    pareja_id: int
+    pago_estado: str
+    pago_monto: Optional[float] = None
+    pago_comprobante_url: Optional[str] = None
+    pago_fecha_acreditacion: Optional[str] = None
+    motivo_rechazo_pago: Optional[str] = None
+
+
+# ============================================
+# Schemas para Carga Masiva de Resultados
+# ============================================
+
+class ResultadoSimplificado(BaseModel):
+    """
+    Resultado simplificado para carga rápida
+    Formato: "6-4 6-3" o "6-4 4-6 7-5"
+    """
+    partido_id: int
+    resultado_texto: str = Field(..., description="Formato: '6-4 6-3' o '6-4 4-6 7-5'")
+    
+    @validator('resultado_texto')
+    def validar_formato(cls, v):
+        """Valida que el formato sea correcto"""
+        import re
+        # Formato: "6-4 6-3" o "6-4 4-6 7-5" (2 o 3 sets)
+        pattern = r'^(\d{1,2}-\d{1,2})(\s+\d{1,2}-\d{1,2}){1,2}$'
+        if not re.match(pattern, v.strip()):
+            raise ValueError('Formato inválido. Use: "6-4 6-3" o "6-4 4-6 7-5"')
+        return v.strip()
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "partido_id": 123,
+                "resultado_texto": "6-4 6-3"
+            }
+        }
+
+
+class ResultadoMasivoRequest(BaseModel):
+    """Request para cargar múltiples resultados a la vez"""
+    resultados: List[ResultadoSimplificado] = Field(..., min_items=1, max_items=50)
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "resultados": [
+                    {"partido_id": 123, "resultado_texto": "6-4 6-3"},
+                    {"partido_id": 124, "resultado_texto": "6-4 4-6 7-5"},
+                    {"partido_id": 125, "resultado_texto": "6-2 6-1"}
+                ]
+            }
+        }
+
+
+class ResultadoMasivoItem(BaseModel):
+    """Item individual del resultado masivo"""
+    partido_id: int
+    exito: bool
+    mensaje: str
+    ganador_pareja_id: Optional[int] = None
+    error: Optional[str] = None
+
+
+class ResultadoMasivoResponse(BaseModel):
+    """Response de carga masiva de resultados"""
+    total: int
+    exitosos: int
+    fallidos: int
+    resultados: List[ResultadoMasivoItem]
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "total": 3,
+                "exitosos": 2,
+                "fallidos": 1,
+                "resultados": [
+                    {
+                        "partido_id": 123,
+                        "exito": True,
+                        "mensaje": "Resultado cargado correctamente",
+                        "ganador_pareja_id": 45
+                    },
+                    {
+                        "partido_id": 124,
+                        "exito": True,
+                        "mensaje": "Resultado cargado correctamente",
+                        "ganador_pareja_id": 47
+                    },
+                    {
+                        "partido_id": 125,
+                        "exito": False,
+                        "mensaje": "Error al cargar resultado",
+                        "error": "Partido ya tiene resultado"
+                    }
+                ]
+            }
+        }

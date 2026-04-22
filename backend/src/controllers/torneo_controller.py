@@ -2310,6 +2310,71 @@ def obtener_estadisticas_partido(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
+@router.post("/{torneo_id}/resultados/masivo")
+def cargar_resultados_masivo(
+    torneo_id: int,
+    request_data: dict,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user)
+):
+    """
+    Carga múltiples resultados de partidos en una sola operación
+    
+    Formato simplificado para cada resultado:
+    - partido_id: ID del partido
+    - resultado_texto: String con formato "6-4 6-3" o "6-4 4-6 7-5"
+    
+    Ejemplo de request:
+    {
+        "resultados": [
+            {"partido_id": 123, "resultado_texto": "6-4 6-3"},
+            {"partido_id": 124, "resultado_texto": "6-4 4-6 7-5"},
+            {"partido_id": 125, "resultado_texto": "6-2 6-1"}
+        ]
+    }
+    
+    Ventajas:
+    - Carga rápida desde mobile
+    - Procesa todos los partidos en una sola petición
+    - Devuelve resumen con éxitos y fallos
+    - Si un partido falla, continúa con los demás
+    
+    Solo organizadores pueden cargar resultados
+    """
+    from ..services.torneo_resultado_service import TorneoResultadoService
+    
+    try:
+        user_id = current_user.id_usuario
+        resultados_data = request_data.get('resultados', [])
+        
+        if not resultados_data:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Debe enviar al menos un resultado"
+            )
+        
+        if len(resultados_data) > 50:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Máximo 50 resultados por operación"
+            )
+        
+        resultado = TorneoResultadoService.cargar_resultados_masivo(
+            db, torneo_id, resultados_data, user_id
+        )
+        
+        return resultado
+        
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
 @router.get("/{torneo_id}/zonas/{zona_id}/clasificados")
 def obtener_clasificados_zona(
     torneo_id: int,

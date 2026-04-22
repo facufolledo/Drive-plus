@@ -603,6 +603,16 @@ class TorneoService {
     return response.data;
   }
 
+  // Carga masiva de resultados
+  async cargarResultadosMasivo(torneoId: number, data: { resultados: Array<{ partido_id: number; resultado_texto: string }> }): Promise<any> {
+    const response = await axios.post(
+      `${API_URL}/torneos/${torneoId}/resultados/masivo`,
+      data,
+      this.getAuthHeaders()
+    );
+    return response.data;
+  }
+
   // Canchas
   async listarCanchas(torneoId: number): Promise<any[]> {
     const response = await axios.get(`${API_URL}/torneos/${torneoId}/canchas`);
